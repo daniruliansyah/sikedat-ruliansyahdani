@@ -1,5 +1,295 @@
-<h1>ini landingpage</h1>
-<p>mungkin menampilkan informasi mengenai ini apklikasi apa dan dibuat menarik
-    karena ini adalah halaman pertama yang di akses oleh user, jadi harus menarik dan informatif.
-    mungkin juga bisa diselipkan informasi mengenai traffic di surabaya.
-</p>
+{% extends "base.html" %}
+
+{% block title %}Beranda{% endblock %}
+{% block page_title %}Beranda{% endblock %}
+{% block breadcrumb %}Beranda{% endblock %}
+
+{% block content %}
+
+<!-- Page Header -->
+<div class="page-header">
+  {# <h1>Selamat Datang, {{ current_user.username if current_user.is_authenticated else 'Admin' }} 👋</h1> #}
+  <h1>Selamat Datang, Admin 👋</h1>
+  <p>Ringkasan sistem klasifikasi kepadatan lalu lintas Jalan Diponegoro, Surabaya.</p>
+</div>
+
+<!-- ── STAT CARDS ── -->
+<div class="grid grid-4 fade-in" style="margin-bottom: 24px;">
+
+  <div class="stat-card fade-in delay-1">
+    <span class="stat-icon">📊</span>
+    <div class="stat-label">Total Data Tersimpan</div>
+    <div class="stat-value">{{ total_data | default('1,008') }}</div>
+    <div class="stat-meta">
+      <span style="color:var(--success);">↑ 48</span> baris baru hari ini
+    </div>
+  </div>
+
+  <div class="stat-card cyan fade-in delay-2">
+    <span class="stat-icon">🚗</span>
+    <div class="stat-label">Total Kendaraan (Hari Ini)</div>
+    <div class="stat-value">{{ total_kendaraan_hari_ini | default('4,287') }}</div>
+    <div class="stat-meta">
+      Dari <span style="color:var(--cyan);">{{ total_interval | default('48') }}</span> interval waktu
+    </div>
+  </div>
+
+  <div class="stat-card warning fade-in delay-3">
+    <span class="stat-icon">⚠️</span>
+    <div class="stat-label">Menunggu Validasi</div>
+    <div class="stat-value">{{ pending_validasi | default('0') }}</div>
+    <div class="stat-meta">
+      <a href="{{ url_for('validasi') }}" style="color:var(--warning);">Validasi sekarang →</a>
+    </div>
+  </div>
+
+  <div class="stat-card success fade-in delay-4">
+    <span class="stat-icon">✅</span>
+    <div class="stat-label">Model Aktif</div>
+    <div class="stat-value" style="font-size:20px;">{{ model_aktif | default('Random Forest') }}</div>
+    <div class="stat-meta">
+      <div class="live-dot" style="width:6px;height:6px;"></div>
+      Siap digunakan
+    </div>
+  </div>
+
+</div>
+
+<!-- ── ROW 2: Chart + Kepadatan Sekarang ── -->
+<div class="grid" style="grid-template-columns: 1fr 340px; gap: 20px; margin-bottom: 24px;">
+
+  <!-- Grafik Kepadatan Hari Ini -->
+  <div class="card fade-in delay-2">
+    <div class="card-header">
+      <div>
+        <div class="card-title"><span class="dot"></span>Pola Kepadatan Hari Ini</div>
+        <div class="card-subtitle">Jumlah kendaraan per interval 10 menit</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="badge badge-primary">Jl. Diponegoro</span>
+      </div>
+    </div>
+    <div class="chart-container" style="height: 220px;">
+      <canvas id="chartHariIni"></canvas>
+    </div>
+    <div class="flex items-center gap-4 mt-3" style="font-size:12px;color:var(--text-muted);">
+      <span>🟢 Rendah</span><span>🟡 Sedang</span><span>🔴 Tinggi</span>
+    </div>
+  </div>
+
+  <!-- Status Kepadatan Saat Ini -->
+  <div class="card fade-in delay-3" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--text-muted);text-transform:uppercase;margin-bottom:16px;">
+      Kepadatan Terkini
+    </div>
+    <div id="currentStatus" style="
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: {{ 'var(--label-sedang-bg)' }};
+      border: 3px solid {{ 'var(--label-sedang)' }};
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      margin-bottom: 18px;
+      box-shadow: 0 0 30px rgba(245,158,11,0.2);
+    ">
+      <span style="font-size: 36px;">🟡</span>
+    </div>
+    <div style="font-size:22px;font-weight:800;color:var(--label-sedang);margin-bottom:4px;">
+      {{ kepadatan_terkini | default('SEDANG') }}
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);">
+      Update terakhir: <span class="text-mono">{{ last_update | default('06:50 WIB') }}</span>
+    </div>
+    <div class="divider" style="width:100%;"></div>
+    <a href="{{ url_for('prediksi') }}" class="btn btn-outline btn-sm w-full">
+      Cek Prediksi Manual →
+    </a>
+  </div>
+
+</div>
+
+<!-- ── ROW 3: Komposisi Kendaraan + Aktivitas Terbaru ── -->
+<div class="grid grid-2 fade-in delay-3" style="margin-bottom: 24px;">
+
+  <!-- Komposisi Kendaraan -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--cyan);"></span>Komposisi Kendaraan (Hari Ini)</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:24px;">
+      <div class="chart-container" style="width:160px;height:160px;flex-shrink:0;">
+        <canvas id="chartKomposisi"></canvas>
+      </div>
+      <div style="flex:1;">
+        {% set vehicles = [
+          ('🏍️', 'Motor',  total_motor|default(2841), '#1A6FFF', 66),
+          ('🚗', 'Mobil',  total_mobil|default(987),  '#00C4FF', 23),
+          ('🚌', 'Bus',    total_bus|default(287),    '#10C981', 7),
+          ('🚛', 'Truk',   total_truk|default(172),   '#F59E0B', 4),
+        ] %}
+        {% for icon, label, val, color, pct in vehicles %}
+        <div style="margin-bottom:12px;">
+          <div class="flex items-center justify-between" style="margin-bottom:4px;font-size:12.5px;">
+            <span>{{ icon }} {{ label }}</span>
+            <span class="text-mono" style="color:{{ color }};">{{ val }}</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:{{ pct }}%;background:{{ color }};"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Aktivitas Terbaru / Log -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--success);"></span>Log Aktivitas Terbaru</div>
+      <a href="{{ url_for('validasi') }}" class="btn btn-ghost btn-sm">Lihat Semua</a>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:0;">
+      {% set activities = [
+        ('Klasifikasi selesai', 'data_senin_pagi.csv · 48 baris', '10 menit lalu', 'success'),
+        ('Validasi dilakukan', '2 label dikoreksi dari Sedang → Tinggi', '25 menit lalu', 'warning'),
+        ('Model di-retrain', 'Random Forest · Akurasi meningkat', '2 jam lalu', 'primary'),
+        ('Upload data baru', 'data_minggu_sore.csv · 48 baris', '3 jam lalu', 'info'),
+        ('Login sistem', 'Staff Dishub masuk ke sistem', '3 jam lalu', 'success'),
+      ] %}
+      {% for title, desc, time, type in activities %}
+      <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:3px;padding:12px 0;">
+        <div class="flex items-center justify-between w-full">
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ title }}</span>
+          <span style="font-size:11px;color:var(--text-muted);">{{ time }}</span>
+        </div>
+        <span style="font-size:12px;color:var(--text-muted);">{{ desc }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── ROW 4: Quick Actions ── -->
+<div class="card fade-in delay-4">
+  <div class="card-title" style="margin-bottom:16px;"><span class="dot" style="background:var(--warning);"></span>Aksi Cepat</div>
+  <div class="flex items-center gap-3 flex-wrap">
+    <a href="{{ url_for('classifier') }}" class="btn btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Klasifikasi Data Baru
+    </a>
+    <a href="{{ url_for('prediksi') }}" class="btn btn-outline">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      Prediksi Manual
+    </a>
+    <a href="{{ url_for('validasi') }}" class="btn btn-outline">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 12l2 2 4-4"/>
+        <path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/>
+      </svg>
+      Validasi Data
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      Lihat Dashboard
+    </a>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  Chart.defaults.color = '#7A9ABF';
+  Chart.defaults.font.family = "'DM Mono', monospace";
+
+  // ── Chart Hari Ini (Line) ──
+  const ctxLine = document.getElementById('chartHariIni').getContext('2d');
+  const labels = Array.from({length: 48}, (_, i) => {
+    const startHour = i < 18 ? 6 : 15;
+    const offset = i < 18 ? i : i - 18;
+    const h = startHour + Math.floor(offset * 10 / 60);
+    const m = (offset * 10) % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  });
+
+  const sampleData = {{ chart_data_hari_ini | default([
+    30,28,32,45,58,72,91,105,88,76,60,55,50,48,52,61,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,65,78,95,110,102,88,75,62,50,45,42,40,38,36
+  ]) | tojson }};
+
+  const bgGradient = ctxLine.createLinearGradient(0, 0, 0, 200);
+  bgGradient.addColorStop(0, 'rgba(26,111,255,0.25)');
+  bgGradient.addColorStop(1, 'rgba(26,111,255,0.01)');
+
+  new Chart(ctxLine, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Total Kendaraan',
+        data: sampleData,
+        borderColor: '#1A6FFF',
+        backgroundColor: bgGradient,
+        borderWidth: 2,
+        tension: 0.4,
+        fill: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { maxTicksLimit: 8, font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+
+  // ── Chart Komposisi (Doughnut) ──
+  const ctxDnut = document.getElementById('chartKomposisi').getContext('2d');
+  new Chart(ctxDnut, {
+    type: 'doughnut',
+    data: {
+      labels: ['Motor', 'Mobil', 'Bus', 'Truk'],
+      datasets: [{
+        data: [
+          {{ total_motor|default(2841) }},
+          {{ total_mobil|default(987) }},
+          {{ total_bus|default(287) }},
+          {{ total_truk|default(172) }}
+        ],
+        backgroundColor: ['#1A6FFF','#00C4FF','#10C981','#F59E0B'],
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()}`
+        }}
+      }
+    }
+  });
+</script>
+{% endblock %}

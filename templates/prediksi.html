@@ -1,5 +1,274 @@
-<h1>ini halaman prediksi untuk masyarakat</h1>
-<p>jadi ini halaman yang digunakan untuk user masyarakat tanpa harus login yaitu halaman yang nantinya
-    di halaman ini user dapat melakukan input data berupa hari, jam, dan jenis kendaraan, lalu nanti akan
-    muncul hasil prediksi tingkat kepadatan lalu ada penjelasan mengenai hasil prediksi tersebut. dan juga ada saran untuk menghindari kemacetan berdasarkan hasil prediksi tersebut.
-</p>
+{% extends "base.html" %}
+
+{% block title %}Prediksi Manual{% endblock %}
+{% block page_title %}Prediksi Manual{% endblock %}
+{% block breadcrumb %}Prediksi Manual{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Prediksi Kepadatan Manual</h1>
+  <p>Masukkan data volume kendaraan secara manual untuk mendapatkan prediksi tingkat kepadatan secara instan.</p>
+</div>
+
+<div class="grid grid-12 fade-in">
+
+  <!-- ── FORM INPUT ── -->
+  <div class="col-span-7">
+    <div class="card fade-in delay-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Input Data Kendaraan</div>
+        <div class="card-subtitle">Isi semua kolom sesuai hasil pengamatan / ekstraksi</div>
+      </div>
+
+      <form method="POST" action="{{ url_for('prediksi') }}" id="prediksiForm">
+        {# {{{ form.hidden_tag() if form.hidden_tag is defined }}} #}
+
+        <!-- Waktu Pengamatan -->
+        <div style="background:var(--bg-elevated);border-radius:var(--radius-md);padding:16px;margin-bottom:20px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
+            📅 Waktu Pengamatan
+          </div>
+          <div class="grid grid-3" style="gap:14px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Hari</label>
+              <select class="form-control" name="hari" id="inputHari" required>
+                <option value="">— Pilih Hari —</option>
+                {% for hari in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}
+                <option value="{{ hari }}" {{ 'selected' if form_data and form_data.hari == hari else '' }}>{{ hari }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Jam (0–23)</label>
+              <input type="number" class="form-control" name="jam" id="inputJam"
+                     min="0" max="23" placeholder="cth: 7"
+                     value="{{ form_data.jam if form_data else '' }}" required />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Interval Menit</label>
+              <select class="form-control" name="menit" id="inputMenit" required>
+                <option value="">— Pilih —</option>
+                {% for m in [10,20,30,40,50,60] %}
+                <option value="{{ m }}" {{ 'selected' if form_data and form_data.menit|string == m|string else '' }}>+{{ m }} menit</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Volume Kendaraan -->
+        <div style="background:var(--bg-elevated);border-radius:var(--radius-md);padding:16px;margin-bottom:20px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
+            🚗 Volume Kendaraan
+          </div>
+          <div class="grid grid-2" style="gap:14px;">
+
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">
+                🏍️ Sepeda Motor
+              </label>
+              <input type="number" class="form-control" name="motor" id="inputMotor"
+                     min="0" placeholder="Jumlah motor"
+                     value="{{ form_data.motor if form_data else '' }}"
+                     oninput="updateTotal()" required />
+            </div>
+
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">
+                🚗 Mobil Penumpang
+              </label>
+              <input type="number" class="form-control" name="mobil" id="inputMobil"
+                     min="0" placeholder="Jumlah mobil"
+                     value="{{ form_data.mobil if form_data else '' }}"
+                     oninput="updateTotal()" required />
+            </div>
+
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">
+                🚌 Bus / Angkutan Umum
+              </label>
+              <input type="number" class="form-control" name="bus" id="inputBus"
+                     min="0" placeholder="Jumlah bus"
+                     value="{{ form_data.bus if form_data else '' }}"
+                     oninput="updateTotal()" required />
+            </div>
+
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">
+                🚛 Truk / Kendaraan Berat
+              </label>
+              <input type="number" class="form-control" name="truk" id="inputTruk"
+                     min="0" placeholder="Jumlah truk"
+                     value="{{ form_data.truk if form_data else '' }}"
+                     oninput="updateTotal()" required />
+            </div>
+
+          </div>
+
+          <!-- Total Kendaraan (auto-calc) -->
+          <div style="margin-top:14px;padding:12px 16px;background:var(--bg-card);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:12.5px;color:var(--text-muted);">Total Kendaraan (otomatis)</span>
+            <span id="totalDisplay" style="font-family:var(--font-mono);font-size:22px;font-weight:500;color:var(--primary-light);">
+              {{ form_data.total_kendaraan if form_data else '0' }}
+            </span>
+          </div>
+          <input type="hidden" name="total_kendaraan" id="inputTotal" value="{{ form_data.total_kendaraan if form_data else '0' }}" />
+
+        </div>
+
+        <!-- Model + Submit -->
+        <div class="grid grid-2" style="gap:14px;align-items:end;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Model Klasifikasi</label>
+            <select class="form-control" name="model_choice">
+              <option value="best" selected>🏆 Model Terbaik</option>
+              <option value="rf">🌲 Random Forest</option>
+              <option value="svm">⚙️ SVM</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg w-full">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Prediksi Sekarang
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ── RESULT PANEL ── -->
+  <div class="col-span-5">
+
+    <!-- Hasil Prediksi -->
+    <div class="card fade-in delay-2" style="margin-bottom: 20px;">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--success);"></span>Hasil Prediksi</div>
+      </div>
+
+      {% if prediction %}
+      <!-- Ada Hasil -->
+      <div style="text-align:center;padding:16px 0 24px;">
+        <div style="
+          width:140px;height:140px;border-radius:50%;margin:0 auto 20px;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          background:var(--label-{{ prediction.label | lower }}-bg);
+          border:3px solid var(--label-{{ prediction.label | lower }});
+          box-shadow:0 0 40px var(--label-{{ prediction.label | lower }}-bg);
+          font-size:40px;
+        ">
+          {{ '🟢' if prediction.label == 'Rendah' else ('🟡' if prediction.label == 'Sedang' else '🔴') }}
+        </div>
+        <div style="font-size:28px;font-weight:800;color:var(--label-{{ prediction.label | lower }});margin-bottom:6px;">
+          {{ prediction.label | upper }}
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);">Tingkat Kepadatan Lalu Lintas</div>
+
+        <div style="margin-top:24px;padding:14px 20px;background:var(--bg-elevated);border-radius:var(--radius-md);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px;">Probabilitas Kelas</div>
+          {% for cls, prob in prediction.proba.items() %}
+          <div style="margin-bottom:8px;">
+            <div class="flex justify-between" style="font-size:12px;margin-bottom:3px;">
+              <span>{{ cls }}</span>
+              <span class="text-mono" style="color:var(--label-{{ cls | lower }});">{{ (prob * 100) | round(1) }}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill {{ 'success' if cls == 'Rendah' else ('warning' if cls == 'Sedang' else 'danger') }}"
+                   style="width:{{ (prob * 100) | round(1) }}%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% else %}
+      <!-- Belum Ada Hasil -->
+      <div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:52px;margin-bottom:16px;opacity:0.3;">🔍</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Belum Ada Prediksi</div>
+        <div style="font-size:12.5px;color:var(--text-muted);">Isi form di sebelah kiri dan klik<br>"Prediksi Sekarang" untuk memulai.</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Riwayat Prediksi -->
+    <div class="card fade-in delay-3">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--warning);"></span>Riwayat Prediksi</div>
+        <span style="font-size:12px;color:var(--text-muted);">Sesi ini</span>
+      </div>
+
+      {% if history %}
+      {% for h in history[-5:]|reverse %}
+      <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:4px;padding:10px 0;">
+        <div class="flex w-full justify-between items-center">
+          <span style="font-size:12.5px;font-weight:600;">{{ h.hari }}, {{ h.jam }}:{{ h.menit }} WIB</span>
+          <span class="badge badge-{{ h.label | lower }}">{{ h.label }}</span>
+        </div>
+        <span style="font-size:11.5px;color:var(--text-muted);">
+          Motor:{{ h.motor }} · Mobil:{{ h.mobil }} · Bus:{{ h.bus }} · Truk:{{ h.truk }} · Total:{{ h.total }}
+        </span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <!-- Placeholder history -->
+      {% for item in [
+        ('Senin', '07', '10', 'Tinggi'),
+        ('Senin', '06', '50', 'Sedang'),
+        ('Senin', '06', '40', 'Rendah'),
+      ] %}
+      <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:4px;padding:10px 0;">
+        <div class="flex w-full justify-between items-center">
+          <span style="font-size:12.5px;font-weight:600;">{{ item[0] }}, {{ item[1] }}:{{ item[2] }} WIB</span>
+          <span class="badge badge-{{ item[3] | lower }}">{{ item[3] }}</span>
+        </div>
+        <span style="font-size:11.5px;color:var(--text-muted);">Contoh data historis</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Insight Box -->
+<div class="card fade-in delay-4" style="margin-top: 20px;">
+  <div class="card-title" style="margin-bottom: 12px;"><span class="dot" style="background:var(--info);"></span>ℹ️ Panduan Kategori Kepadatan</div>
+  <div class="grid grid-3" style="gap:14px;">
+    {% for icon, label, color, bg, desc in [
+      ('🟢','RENDAH','var(--label-rendah)','var(--label-rendah-bg)','Arus bebas, kecepatan maksimal, tidak ada antrian. Volume jauh di bawah kapasitas jalan.'),
+      ('🟡','SEDANG','var(--label-sedang)','var(--label-sedang-bg)','Arus stabil namun jarak antar kendaraan mulai merapat. Volume meningkat namun masih mengalir lancar.'),
+      ('🔴','TINGGI','var(--label-tinggi)','var(--label-tinggi-bg)','Arus tidak stabil, kecepatan sangat rendah, sering stop-and-go. Volume mendekati/melebihi kapasitas.'),
+    ] %}
+    <div style="padding:14px 16px;background:{{ bg }};border-radius:var(--radius-md);border:1px solid {{ color }}33;">
+      <div style="font-size:13px;font-weight:800;color:{{ color }};margin-bottom:6px;">{{ icon }} {{ label }}</div>
+      <div style="font-size:12px;color:var(--text-secondary);">{{ desc }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function updateTotal() {
+    const motor = parseInt(document.getElementById('inputMotor').value) || 0;
+    const mobil = parseInt(document.getElementById('inputMobil').value) || 0;
+    const bus   = parseInt(document.getElementById('inputBus').value)   || 0;
+    const truk  = parseInt(document.getElementById('inputTruk').value)  || 0;
+    const total = motor + mobil + bus + truk;
+    document.getElementById('totalDisplay').textContent = total.toLocaleString();
+    document.getElementById('inputTotal').value = total;
+  }
+
+  document.getElementById('prediksiForm').addEventListener('submit', function() {
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    document.getElementById('loadingText').textContent = 'Memproses prediksi...';
+  });
+</script>
+{% endblock %}
