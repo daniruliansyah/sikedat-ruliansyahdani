@@ -1,4 +1,363 @@
-<h1>ini buat latih ulang model</h1>
-<p>kalo ada penambahan dataset baru, maka nanti akan muncul di halaman ini
-    dan ada penawaran u=button untuk latih ulang model dengan dataset yang baru ditambahkan
-</p>
+{% extends "base.html" %}
+
+{% block title %}Retrain Model{% endblock %}
+{% block page_title %}Retrain Model{% endblock %}
+{% block breadcrumb %}Retrain Model{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Retrain Model</h1>
+  <p>Latih ulang model klasifikasi menggunakan data yang telah divalidasi oleh pakar Dishub.</p>
+</div>
+
+<!-- ── CURRENT MODEL INFO ── -->
+<div class="grid grid-12 fade-in" style="margin-bottom: 20px;">
+
+  <!-- Model Aktif -->
+  <div class="card col-span-8">
+    <div class="card-header">
+      <div class="card-title"><span class="dot"></span>Model Saat Ini (Aktif)</div>
+      <span class="badge badge-success">
+        <span class="dot"></span> Aktif
+      </span>
+    </div>
+    <div class="grid grid-2" style="gap:16px;">
+      <div>
+        <div class="kv-pair">
+          <span class="key">Algoritma</span>
+          <span class="val">{{ model_info.algoritma | default('Random Forest') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">Versi</span>
+          <span class="val text-mono">{{ model_info.versi | default('v1.0') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">Tanggal Latih</span>
+          <span class="val">{{ model_info.tanggal | default('—') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">Jumlah Data Latih</span>
+          <span class="val text-mono">{{ model_info.n_train | default('806') }} baris</span>
+        </div>
+      </div>
+      <div>
+        <div class="kv-pair">
+          <span class="key">Akurasi Test</span>
+          <span class="val" style="color:var(--success);">{{ model_info.accuracy | default('—') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">Precision (w.avg)</span>
+          <span class="val" style="color:var(--success);">{{ model_info.precision | default('—') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">Recall (w.avg)</span>
+          <span class="val" style="color:var(--success);">{{ model_info.recall | default('—') }}</span>
+        </div>
+        <div class="kv-pair">
+          <span class="key">F1-Score (w.avg)</span>
+          <span class="val" style="color:var(--success);">{{ model_info.f1 | default('—') }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="alert alert-info mt-3" style="padding:10px 14px;">
+      <span class="alert-icon" style="font-size:14px;">ℹ️</span>
+      <div style="font-size:12.5px;">Model akan otomatis diperbarui ke versi baru setelah retrain selesai jika performa meningkat.</div>
+    </div>
+  </div>
+
+  <!-- Data Tersedia untuk Retrain -->
+  <div class="card col-span-4" style="display:flex;flex-direction:column;">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--warning);"></span>Data Retrain</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:12px;">
+      <div style="padding:14px;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Data Tervalidasi</div>
+        <div style="font-family:var(--font-mono);font-size:26px;color:var(--success);">
+          {{ n_validated | default('—') }}
+          <span style="font-size:14px;color:var(--text-muted);">baris</span>
+        </div>
+      </div>
+      <div style="padding:14px;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Label Dikoreksi</div>
+        <div style="font-family:var(--font-mono);font-size:26px;color:var(--warning);">
+          {{ n_corrected | default('—') }}
+          <span style="font-size:14px;color:var(--text-muted);">baris</span>
+        </div>
+      </div>
+      <div style="padding:14px;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Total Dataset</div>
+        <div style="font-family:var(--font-mono);font-size:26px;color:var(--primary-light);">
+          {{ total_dataset | default('1,008') }}
+          <span style="font-size:14px;color:var(--text-muted);">baris</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── RETRAIN CONFIG ── -->
+<div class="card fade-in delay-1" style="margin-bottom: 20px;">
+  <div class="card-header">
+    <div class="card-title"><span class="dot" style="background:var(--cyan);"></span>Konfigurasi Retrain</div>
+    <div class="card-subtitle">Atur parameter sebelum memulai proses retrain</div>
+  </div>
+
+  <form method="POST" action="{{ url_for('retrain_model') }}" id="retrainForm">
+    {{ form.hidden_tag() if form.hidden_tag is defined }}
+
+    <div class="grid grid-3" style="gap:20px;margin-bottom:22px;">
+
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Algoritma Target</label>
+        <select class="form-control" name="algoritma" id="selectAlgoritma" onchange="updateParamUI()">
+          <option value="rf">🌲 Random Forest</option>
+          <option value="svm">⚙️ Support Vector Machine</option>
+          <option value="both">🔄 Keduanya (RF + SVM)</option>
+        </select>
+        <div class="form-hint">Pilih model yang akan di-retrain</div>
+      </div>
+
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Rasio Split Data</label>
+        <select class="form-control" name="split_ratio">
+          <option value="0.8" selected>80% Train / 20% Test</option>
+          <option value="0.75">75% Train / 25% Test</option>
+          <option value="0.7">70% Train / 30% Test</option>
+        </select>
+        <div class="form-hint">Pembagian data latih dan uji (stratified)</div>
+      </div>
+
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Cross-Validation Fold</label>
+        <select class="form-control" name="cv_fold">
+          <option value="5" selected>5-Fold CV</option>
+          <option value="3">3-Fold CV</option>
+          <option value="10">10-Fold CV</option>
+        </select>
+        <div class="form-hint">Jumlah fold untuk cross-validation</div>
+      </div>
+
+    </div>
+
+    <!-- Hyperparameter Tuning Toggle -->
+    <div style="padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:20px;">
+      <label class="flex items-center gap-3" style="cursor:pointer;margin-bottom:0;">
+        <input type="checkbox" name="do_tuning" id="doTuning" value="1"
+               style="accent-color:var(--primary);width:16px;height:16px;cursor:pointer;"
+               onchange="toggleTuningOptions()" />
+        <div>
+          <div style="font-size:13.5px;font-weight:700;color:var(--text-heading);">🔧 Aktifkan Hyperparameter Tuning (GridSearchCV)</div>
+          <div style="font-size:12px;color:var(--text-muted);">Proses lebih lama namun menghasilkan parameter optimal</div>
+        </div>
+      </label>
+    </div>
+
+    <!-- RF Params -->
+    <div id="rfParams" style="padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
+        🌲 Parameter Random Forest
+      </div>
+      <div class="grid grid-4" style="gap:14px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">n_estimators</label>
+          <input type="number" class="form-control" name="rf_n_estimators" value="100" min="50" max="500" step="50" />
+          <div class="form-hint">Jumlah pohon (50–500)</div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">max_depth</label>
+          <input type="number" class="form-control" name="rf_max_depth" value="20" min="5" max="50" />
+          <div class="form-hint">Kedalaman pohon (None = unlimited)</div>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">min_samples_split</label>
+          <select class="form-control" name="rf_min_samples_split">
+            <option value="2" selected>2</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">min_samples_leaf</label>
+          <select class="form-control" name="rf_min_samples_leaf">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- SVM Params (hidden by default) -->
+    <div id="svmParams" style="padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:16px;display:none;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
+        ⚙️ Parameter SVM
+      </div>
+      <div class="grid grid-4" style="gap:14px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Kernel</label>
+          <select class="form-control" name="svm_kernel">
+            <option value="rbf" selected>RBF</option>
+            <option value="linear">Linear</option>
+            <option value="poly">Polynomial</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">C (Regularisasi)</label>
+          <select class="form-control" name="svm_c">
+            <option value="0.1">0.1</option>
+            <option value="1" selected>1</option>
+            <option value="10">10</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Gamma</label>
+          <select class="form-control" name="svm_gamma">
+            <option value="scale" selected>scale</option>
+            <option value="auto">auto</option>
+            <option value="0.1">0.1</option>
+            <option value="0.01">0.01</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">random_state</label>
+          <input type="number" class="form-control" name="svm_random_state" value="42" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn btn-primary btn-lg" id="btnRetrain">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Mulai Retrain Model
+      </button>
+      <div style="font-size:12px;color:var(--text-muted);">
+        Estimasi waktu: <span style="color:var(--warning);">2–8 menit</span> tergantung konfigurasi
+      </div>
+    </div>
+
+  </form>
+</div>
+
+<!-- ── PROGRESS (shown during/after retrain) ── -->
+{% if retrain_status %}
+<div class="card fade-in delay-2" id="retrainProgress" style="margin-bottom: 20px;">
+  <div class="card-header">
+    <div class="card-title"><span class="dot" style="background:var(--primary);"></span>Progress Retrain</div>
+    <span class="badge badge-{{ 'success' if retrain_status == 'selesai' else 'warning' }}">
+      {{ retrain_status | capitalize }}
+    </span>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    {% set steps = [
+      ('Memuat data tervalidasi', True),
+      ('Preprocessing (encode, normalisasi)', True),
+      ('Membagi data Train / Test', True),
+      ('Training model...', retrain_status != 'selesai'),
+      ('Evaluasi performa', False),
+      ('Simpan model baru', False),
+    ] %}
+    {% for label, active in steps %}
+    <div class="flex items-center gap-12">
+      <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;
+           background:{{ 'var(--success)' if loop.index < 4 else ('var(--primary)' if active else 'var(--bg-elevated)') }};
+           border:{{ '2px solid var(--primary)' if active else 'none' }};
+           color:{{ '#fff' if loop.index < 4 or active else 'var(--text-muted)' }};">
+        {{ '✓' if loop.index < 4 else ('⏳' if active else loop.index) }}
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:{{ '600' if active else '400' }};color:{{ 'var(--text-heading)' if active else 'var(--text-muted)' }};">
+          {{ label }}
+        </div>
+      </div>
+      {% if active %}
+      <div class="spinner" style="margin-left:auto;width:16px;height:16px;"></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── RIWAYAT RETRAIN ── -->
+<div class="card fade-in delay-3">
+  <div class="card-header">
+    <div class="card-title"><span class="dot" style="background:var(--success);"></span>Riwayat Retrain</div>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Versi</th><th>Algoritma</th><th>Tanggal</th><th>Data Latih</th>
+          <th>Akurasi</th><th>F1-Score</th><th>Status</th><th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in retrain_history | default([]) %}
+        <tr>
+          <td class="td-mono">{{ h.versi }}</td>
+          <td>{{ h.algoritma }}</td>
+          <td>{{ h.tanggal }}</td>
+          <td class="td-mono">{{ h.n_train }}</td>
+          <td class="td-mono" style="color:var(--success);">{{ h.accuracy }}</td>
+          <td class="td-mono" style="color:var(--success);">{{ h.f1 }}</td>
+          <td><span class="badge badge-{{ 'success' if h.active else 'info' }}">{{ 'Aktif ✓' if h.active else 'Arsip' }}</span></td>
+          <td>
+            {% if not h.active %}
+            <button class="btn btn-ghost btn-sm" onclick="activateModel('{{ h.versi }}')">Aktifkan</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+            <div style="font-size:32px;margin-bottom:8px;">🔄</div>
+            Belum ada riwayat retrain.<br>
+            <small>Jalankan retrain pertama kali di atas.</small>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function updateParamUI() {
+    const val = document.getElementById('selectAlgoritma').value;
+    document.getElementById('rfParams').style.display  = (val === 'rf' || val === 'both')  ? '' : 'none';
+    document.getElementById('svmParams').style.display = (val === 'svm' || val === 'both') ? '' : 'none';
+  }
+
+  function toggleTuningOptions() {
+    const on = document.getElementById('doTuning').checked;
+    document.getElementById('rfParams').style.opacity  = on ? '0.5' : '1';
+    document.getElementById('svmParams').style.opacity = on ? '0.5' : '1';
+  }
+
+  document.getElementById('retrainForm').addEventListener('submit', function () {
+    const btn = document.getElementById('btnRetrain');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px;"></span> Memproses...';
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    document.getElementById('loadingText').textContent = 'Menjalankan retrain model...';
+  });
+
+  function activateModel(version) {
+    if (confirm('Aktifkan model versi ' + version + '?')) {
+      window.location.href = "{{ url_for('activate_model', version='PLACEHOLDER') }}".replace('PLACEHOLDER', version);
+    }
+  }
+</script>
+{% endblock %}
