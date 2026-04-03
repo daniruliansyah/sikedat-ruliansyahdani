@@ -8,107 +8,129 @@
 
 <div class="page-header">
   <h1>Validasi Hasil Klasifikasi</h1>
-  <p>Tinjau dan koreksi label kepadatan hasil prediksi model. Data yang telah divalidasi akan disimpan sebagai ground truth.</p>
+  <p>Tinjau dan koreksi label kepadatan hasil prediksi model. Data tervalidasi akan disimpan sebagai ground truth.</p>
 </div>
 
-<!-- Info Banner -->
 <div class="alert alert-info fade-in" style="margin-bottom: 20px;">
   <span class="alert-icon">💡</span>
   <div class="alert-body">
     <div class="alert-title">Human-in-the-Loop Validation</div>
     <div class="alert-desc">
-      Validasi dilakukan oleh tenaga ahli Dishub. Label yang dikoreksi akan digunakan untuk meningkatkan akurasi model pada sesi <em>retrain</em> berikutnya.
+      Validasi dilakukan oleh tenaga ahli Dishub. Label yang dikoreksi akan digunakan
+      untuk meningkatkan akurasi model pada sesi <em>retrain</em> berikutnya.
     </div>
   </div>
 </div>
 
-<!-- ── STATS ROW ── -->
+<!-- ── STAT CARDS ── -->
 <div class="grid grid-4 fade-in" style="margin-bottom: 20px;">
   <div class="stat-card fade-in delay-1">
     <span class="stat-icon">📋</span>
     <div class="stat-label">Total Data</div>
-    <div class="stat-value">{{ total_data | default('48') }}</div>
-    <div class="stat-meta">Dari file terbaru</div>
+    <div class="stat-value">{{ total_data | default('0') }}</div>
+    <div class="stat-meta">baris dari file terbaru</div>
   </div>
   <div class="stat-card success fade-in delay-2">
     <span class="stat-icon">✅</span>
     <div class="stat-label">Sudah Divalidasi</div>
-    <div class="stat-value">{{ validated | default('0') }}</div>
+    <div class="stat-value" id="statValidated">{{ validated | default('0') }}</div>
     <div class="stat-meta" id="pctValidasi">0% selesai</div>
   </div>
   <div class="stat-card warning fade-in delay-3">
     <span class="stat-icon">⏳</span>
     <div class="stat-label">Menunggu</div>
-    <div class="stat-value" id="pendingCount">{{ pending | default('48') }}</div>
-    <div class="stat-meta">Perlu ditinjau</div>
+    <div class="stat-value" id="statPending">{{ pending | default('0') }}</div>
+    <div class="stat-meta">perlu ditinjau</div>
   </div>
   <div class="stat-card danger fade-in delay-4">
     <span class="stat-icon">✏️</span>
     <div class="stat-label">Dikoreksi</div>
-    <div class="stat-value" id="correctedCount">{{ corrected | default('0') }}</div>
-    <div class="stat-meta">Label diubah</div>
+    <div class="stat-value" id="statCorrected">{{ corrected | default('0') }}</div>
+    <div class="stat-meta">label diubah</div>
   </div>
 </div>
 
 <!-- ── TOOLBAR ── -->
-<div class="card fade-in delay-1" style="margin-bottom: 20px; padding: 14px 20px;">
+<div class="card fade-in delay-1" style="margin-bottom: 16px; padding: 12px 16px;">
   <div class="flex items-center gap-3 flex-wrap">
     <!-- Filter -->
-    <select class="form-control" id="filterKategori" style="width:180px;" onchange="filterTable()">
+    <select class="form-control" id="filterKategori" style="width:170px;"
+            onchange="filterTable()">
       <option value="">Semua Kategori</option>
       <option value="rendah">🟢 Rendah</option>
       <option value="sedang">🟡 Sedang</option>
       <option value="tinggi">🔴 Tinggi</option>
     </select>
-    <select class="form-control" id="filterStatus" style="width:180px;" onchange="filterTable()">
+    <select class="form-control" id="filterStatus" style="width:180px;"
+            onchange="filterTable()">
       <option value="">Semua Status</option>
       <option value="pending">⏳ Belum Divalidasi</option>
       <option value="validated">✅ Sudah Divalidasi</option>
       <option value="corrected">✏️ Dikoreksi</option>
     </select>
-    <!-- Search -->
-    <div class="input-group" style="flex:1;min-width:200px;">
-      <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    <div class="input-group" style="flex:1;min-width:180px;">
+      <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" class="form-control" id="searchInput" placeholder="Cari hari / jam..." oninput="filterTable()" />
+      <input type="text" class="form-control" id="searchInput"
+             placeholder="Cari hari / jam..." oninput="filterTable()" />
     </div>
-    <!-- Bulk Actions -->
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <button class="btn btn-success btn-sm" onclick="bulkValidate()">
-        ✅ Validasi Semua Terpilih
+
+    <!-- Bulk actions -->
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+      <!-- Setujui semua terpilih = tandai valid langsung -->
+      <button class="btn btn-success btn-sm" id="btnSetujuiSemua"
+              onclick="bulkSetujui()" disabled>
+        ✅ Setujui Terpilih
       </button>
-      <button class="btn btn-outline btn-sm" onclick="toggleSelectAll()">
-        ☑️ Pilih Semua
+      <!-- Koreksi semua terpilih = buka dropdown pilih label -->
+      <button class="btn btn-warning btn-sm" id="btnKoreksiSemua"
+              onclick="bulkKoreksiModal()" disabled>
+        ✏️ Koreksi Terpilih
       </button>
-      <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm" id="btnSave">
+      <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm"
+         id="btnSave">
         💾 Simpan Validasi
       </a>
     </div>
   </div>
+
+  <!-- Info baris terpilih -->
+  <div id="selectedInfo" style="font-size:12px;color:var(--text-muted);
+                                  margin-top:10px;display:none;">
+    <span id="selectedCount">0</span> baris dipilih ·
+    <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:12px;"
+            onclick="clearSelection()">Batalkan pilihan</button>
+  </div>
 </div>
 
 <!-- ── TABLE ── -->
-<div class="card fade-in delay-2">
+<div class="card fade-in delay-2" id="tableCard">
   <div class="card-header">
     <div>
       <div class="card-title"><span class="dot"></span>Data Hasil Klasifikasi</div>
-      <div class="card-subtitle" id="tableInfo">Menampilkan {{ total_data | default('48') }} baris</div>
+      <div class="card-subtitle" id="tableInfo">
+        Menampilkan {{ total_data | default('0') }} baris
+      </div>
     </div>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('table')">Tabel</button>
-      <button class="tab" onclick="switchTab('summary')">Ringkasan</button>
+      <button class="tab active" onclick="switchTab('table',this)">Tabel</button>
+      <button class="tab" onclick="switchTab('summary',this)">Ringkasan</button>
     </div>
   </div>
 
-  <!-- Table View -->
+  <!-- ── Tabel ── -->
   <div id="viewTable">
     <div class="table-wrapper">
       <table id="dataTable">
         <thead>
           <tr>
             <th style="width:36px;">
-              <input type="checkbox" id="checkAll" onchange="toggleSelectAll()" style="accent-color:var(--primary);cursor:pointer;" />
+              <input type="checkbox" id="checkAll"
+                     onchange="toggleSelectAll()"
+                     style="accent-color:var(--primary);cursor:pointer;" />
             </th>
             <th>#</th>
             <th>Hari</th>
@@ -122,16 +144,20 @@
             <th>Prediksi Model</th>
             <th>Label Validasi</th>
             <th>Status</th>
-            <th>Aksi</th>
           </tr>
         </thead>
         <tbody id="tableBody">
           {% set sample_rows = validation_data | default([]) %}
           {% if sample_rows %}
             {% for row in sample_rows %}
-            <tr data-kategori="{{ row.prediksi | lower }}" data-status="{{ row.status | lower }}"
+            <tr data-kategori="{{ row.prediksi | lower }}"
+                data-status="{{ row.status | lower }}"
                 data-hari="{{ row.hari | lower }}" class="table-row">
-              <td><input type="checkbox" class="row-check" data-id="{{ row.id }}" style="accent-color:var(--primary);cursor:pointer;"></td>
+              <td>
+                <input type="checkbox" class="row-check" data-id="{{ row.id }}"
+                       style="accent-color:var(--primary);cursor:pointer;"
+                       onchange="onCheckChange()">
+              </td>
               <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
               <td>{{ row.hari }}</td>
               <td class="td-mono">{{ row.jam }}:00</td>
@@ -147,128 +173,174 @@
                 </span>
               </td>
               <td>
-                <select class="form-control form-control-sm label-select"
-                        data-id="{{ row.id }}" data-original="{{ row.prediksi | lower }}"
-                        style="width:110px;font-size:12px;padding:5px 8px;"
-                        onchange="onLabelChange(this)">
-                  <option value="rendah" {{ 'selected' if row.label_final == 'Rendah' }}>🟢 Rendah</option>
-                  <option value="sedang" {{ 'selected' if row.label_final == 'Sedang' }}>🟡 Sedang</option>
-                  <option value="tinggi" {{ 'selected' if row.label_final == 'Tinggi' }}>🔴 Tinggi</option>
-                </select>
-              </td>
-              <td>
-                <span class="badge badge-{{ 'success' if row.status == 'validated' else ('warning' if row.status == 'corrected' else 'info') }}"
-                      id="statusBadge-{{ row.id }}">
-                  {{ '✅ Valid' if row.status == 'validated' else ('✏️ Dikoreksi' if row.status == 'corrected' else '⏳ Pending') }}
-                </span>
-              </td>
-              <td>
-                <div class="flex items-center gap-1">
-                  <button class="btn btn-ghost btn-icon-sm" title="Tandai Valid"
-                          onclick="markValid({{ row.id }})">✅</button>
-                  <button class="btn btn-ghost btn-icon-sm" title="Lihat Detail"
-                          onclick="showDetail({{ row.id }})">🔍</button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-
-          {% else %}
-            <!-- Placeholder / demo rows -->
-            {% set hari_list = ['Senin','Senin','Selasa','Selasa','Rabu','Rabu','Kamis','Kamis'] %}
-            {% set pred_list = ['rendah','sedang','sedang','tinggi','rendah','tinggi','sedang','sedang'] %}
-            {% set stat_list = ['pending','pending','pending','pending','validated','corrected','pending','pending'] %}
-            {% for i in range(8) %}
-            <tr data-kategori="{{ pred_list[i] }}" data-status="{{ stat_list[i] }}"
-                data-hari="{{ hari_list[i] | lower }}" class="table-row">
-              <td><input type="checkbox" class="row-check" data-id="{{ i+1 }}" style="accent-color:var(--primary);cursor:pointer;"></td>
-              <td class="td-mono" style="color:var(--text-muted);">{{ i+1 }}</td>
-              <td>{{ hari_list[i] }}</td>
-              <td class="td-mono">0{{ 6+(i//2) }}:00</td>
-              <td class="td-mono">{{ 10 + (i%6)*10 }}</td>
-              <td class="td-mono" style="color:var(--primary-light);">{{ 25+i*5 }}</td>
-              <td class="td-mono" style="color:var(--cyan);">{{ 8+i*2 }}</td>
-              <td class="td-mono" style="color:var(--success);">{{ 2+i }}</td>
-              <td class="td-mono" style="color:var(--warning);">{{ 1+i }}</td>
-              <td class="td-mono" style="font-weight:600;">{{ 36+i*10 }}</td>
-              <td>
-                <span class="badge badge-{{ pred_list[i] }}">
-                  <span class="dot"></span>{{ pred_list[i] | capitalize }}
-                </span>
-              </td>
-              <td>
                 <select class="form-control label-select"
-                        data-id="{{ i+1 }}" data-original="{{ pred_list[i] }}"
-                        style="width:110px;font-size:12px;padding:5px 8px;"
+                        data-id="{{ row.id }}"
+                        data-original="{{ row.prediksi | lower }}"
+                        style="width:108px;font-size:12px;padding:5px 8px;"
                         onchange="onLabelChange(this)">
-                  <option value="rendah" {{ 'selected' if pred_list[i]=='rendah' }}>🟢 Rendah</option>
-                  <option value="sedang" {{ 'selected' if pred_list[i]=='sedang' }}>🟡 Sedang</option>
-                  <option value="tinggi" {{ 'selected' if pred_list[i]=='tinggi' }}>🔴 Tinggi</option>
+                  <option value="rendah" {{ 'selected' if row.label_final=='Rendah' }}>🟢 Rendah</option>
+                  <option value="sedang" {{ 'selected' if row.label_final=='Sedang' }}>🟡 Sedang</option>
+                  <option value="tinggi" {{ 'selected' if row.label_final=='Tinggi' }}>🔴 Tinggi</option>
                 </select>
               </td>
               <td>
-                {% set sc = {'pending':'info','validated':'success','corrected':'warning'} %}
-                {% set sl = {'pending':'⏳ Pending','validated':'✅ Valid','corrected':'✏️ Dikoreksi'} %}
-                <span class="badge badge-{{ sc[stat_list[i]] }}" id="statusBadge-{{ i+1 }}">
-                  {{ sl[stat_list[i]] }}
+                <span class="badge badge-{{ 'success' if row.status=='validated' else ('warning' if row.status=='corrected' else 'info') }}"
+                      id="statusBadge-{{ row.id }}">
+                  {{ '✅ Valid' if row.status=='validated' else ('✏️ Dikoreksi' if row.status=='corrected' else '⏳ Pending') }}
                 </span>
-              </td>
-              <td>
-                <div class="flex items-center gap-1">
-                  <button class="btn btn-ghost btn-icon-sm" onclick="markValid({{ i+1 }})">✅</button>
-                  <button class="btn btn-ghost btn-icon-sm" onclick="showDetail({{ i+1 }})">🔍</button>
-                </div>
               </td>
             </tr>
             {% endfor %}
+          {% else %}
+          <!-- Placeholder rows -->
+          {% set hari_list  = ['Senin','Senin','Selasa','Selasa','Rabu','Rabu','Kamis','Kamis'] %}
+          {% set pred_list  = ['rendah','sedang','sedang','tinggi','rendah','tinggi','sedang','sedang'] %}
+          {% set stat_list  = ['pending','pending','pending','pending','validated','corrected','pending','pending'] %}
+          {% for i in range(8) %}
+          <tr data-kategori="{{ pred_list[i] }}"
+              data-status="{{ stat_list[i] }}"
+              data-hari="{{ hari_list[i] | lower }}" class="table-row">
+            <td>
+              <input type="checkbox" class="row-check" data-id="{{ i+1 }}"
+                     style="accent-color:var(--primary);cursor:pointer;"
+                     onchange="onCheckChange()">
+            </td>
+            <td class="td-mono" style="color:var(--text-muted);">{{ i+1 }}</td>
+            <td>{{ hari_list[i] }}</td>
+            <td class="td-mono">0{{ 6+(i//2) }}:00</td>
+            <td class="td-mono">{{ 10+(i%6)*10 }}</td>
+            <td class="td-mono" style="color:var(--primary-light);">{{ 25+i*5 }}</td>
+            <td class="td-mono" style="color:var(--cyan);">{{ 8+i*2 }}</td>
+            <td class="td-mono" style="color:var(--success);">{{ 2+i }}</td>
+            <td class="td-mono" style="color:var(--warning);">{{ 1+i }}</td>
+            <td class="td-mono" style="font-weight:600;">{{ 36+i*10 }}</td>
+            <td>
+              <span class="badge badge-{{ pred_list[i] }}">
+                <span class="dot"></span>{{ pred_list[i]|capitalize }}
+              </span>
+            </td>
+            <td>
+              <select class="form-control label-select"
+                      data-id="{{ i+1 }}"
+                      data-original="{{ pred_list[i] }}"
+                      style="width:108px;font-size:12px;padding:5px 8px;"
+                      onchange="onLabelChange(this)">
+                <option value="rendah" {{ 'selected' if pred_list[i]=='rendah' }}>🟢 Rendah</option>
+                <option value="sedang" {{ 'selected' if pred_list[i]=='sedang' }}>🟡 Sedang</option>
+                <option value="tinggi" {{ 'selected' if pred_list[i]=='tinggi' }}>🔴 Tinggi</option>
+              </select>
+            </td>
+            <td>
+              {% set sc = {'pending':'info','validated':'success','corrected':'warning'} %}
+              {% set sl = {'pending':'⏳ Pending','validated':'✅ Valid','corrected':'✏️ Dikoreksi'} %}
+              <span class="badge badge-{{ sc[stat_list[i]] }}"
+                    id="statusBadge-{{ i+1 }}">
+                {{ sl[stat_list[i]] }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
           {% endif %}
         </tbody>
       </table>
     </div>
 
-    <div class="flex items-center justify-between mt-3">
-      <div style="font-size:12px;color:var(--text-muted);" id="selectedInfo">0 baris dipilih</div>
+    <!-- Pagination — TIDAK tertutup sticky bar karena bar ada di dalam card -->
+    <div class="flex items-center justify-between" style="margin-top: 16px;">
+      <div style="font-size:12px;color:var(--text-muted);" id="paginationInfo">
+        Halaman 1
+      </div>
       <div class="pagination">
         <button class="page-btn">‹</button>
         <button class="page-btn active">1</button>
         <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
         <button class="page-btn">›</button>
       </div>
     </div>
   </div>
 
-  <!-- Summary View (hidden by default) -->
+  <!-- ── Ringkasan ── -->
   <div id="viewSummary" style="display:none;">
     <div class="grid grid-3" style="gap:14px;padding:8px 0;">
       {% for label, color in [('Rendah','success'),('Sedang','warning'),('Tinggi','danger')] %}
-      <div style="padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);text-align:center;">
-        <div class="badge badge-{{ label | lower }}" style="margin-bottom:12px;">{{ label }}</div>
-        <div style="font-family:var(--font-mono);font-size:28px;font-weight:500;margin-bottom:4px;">—</div>
+      <div style="padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);
+                  text-align:center;">
+        <div class="badge badge-{{ label | lower }}" style="margin-bottom:12px;">
+          {{ label }}
+        </div>
+        <div style="font-family:var(--font-mono);font-size:28px;font-weight:500;
+                    margin-bottom:4px;">—</div>
         <div style="font-size:12px;color:var(--text-muted);">data divalidasi</div>
       </div>
       {% endfor %}
     </div>
     <div class="alert alert-info mt-3">
       <span class="alert-icon">📊</span>
-      <div>Ringkasan akan tersedia setelah validasi selesai.</div>
+      <div>Ringkasan tersedia setelah validasi selesai.</div>
+    </div>
+  </div>
+
+  <!-- ── Action bar di dalam card (di bawah tabel, bukan fixed/sticky) ── -->
+  <div id="inCardActions" style="
+    display:none;
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-active);
+  ">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--text-heading);"
+             id="inCardInfo">0 perubahan belum disimpan</div>
+        <div style="font-size:11.5px;color:var(--text-muted);">
+          Klik "Simpan" untuk menyimpan ke database
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm">
+          💾 Simpan Sekarang
+        </a>
+        <button class="btn btn-ghost btn-sm" onclick="discardChanges()">
+          Batalkan
+        </button>
+      </div>
     </div>
   </div>
 
 </div>
 
-<!-- Save Action Bar (sticky bottom) -->
-<div style="
-  position: fixed; bottom: 24px; right: 28px;
-  display: flex; gap: 10px; z-index: 99;
-" id="stickyActions" class="hidden fade-in">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);
-       padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-lg);">
-    <div>
-      <div style="font-size:12px;font-weight:700;color:var(--text-heading);" id="stickyInfo">0 baris diubah</div>
-      <div style="font-size:11px;color:var(--text-muted);">Belum disimpan</div>
+<!-- Modal Koreksi Massal -->
+<div class="modal-backdrop" id="koreksiModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Koreksi Label — Terpilih</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm">💾 Simpan</a>
-    <button class="btn btn-ghost btn-sm" onclick="discardChanges()">Batalkan</button>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+      Pilih label yang ingin diterapkan ke semua baris yang dipilih:
+    </p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-sm" onclick="bulkSetLabel('rendah')"
+              style="background:var(--label-rendah-bg);color:var(--label-rendah);
+                     border:1px solid var(--label-rendah);font-size:14px;padding:10px 22px;">
+        🟢 Rendah
+      </button>
+      <button class="btn btn-sm" onclick="bulkSetLabel('sedang')"
+              style="background:var(--label-sedang-bg);color:var(--label-sedang);
+                     border:1px solid var(--label-sedang);font-size:14px;padding:10px 22px;">
+        🟡 Sedang
+      </button>
+      <button class="btn btn-sm" onclick="bulkSetLabel('tinggi')"
+              style="background:var(--label-tinggi-bg);color:var(--label-tinggi);
+                     border:1px solid var(--label-tinggi);font-size:14px;padding:10px 22px;">
+        🔴 Tinggi
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Batal</button>
+    </div>
   </div>
 </div>
 
@@ -276,96 +348,135 @@
 
 {% block extra_scripts %}
 <script>
-  let changedRows = new Set();
+  let changedRows   = new Set();
   let validatedRows = new Set();
+  const TOTAL       = parseInt('{{ total_data | default(8) }}') || 8;
 
+  /* ── Label change ── */
   function onLabelChange(select) {
-    const id = select.dataset.id;
+    const id       = select.dataset.id;
     const original = select.dataset.original;
-    const badge = document.getElementById('statusBadge-' + id);
-
+    const badge    = document.getElementById('statusBadge-' + id);
     if (select.value !== original) {
       changedRows.add(id);
-      badge.className = 'badge badge-warning';
+      badge.className   = 'badge badge-warning';
       badge.textContent = '✏️ Dikoreksi';
-      document.getElementById('correctedCount').textContent = changedRows.size;
     } else {
       changedRows.delete(id);
-      badge.className = 'badge badge-info';
+      badge.className   = 'badge badge-info';
       badge.textContent = '⏳ Pending';
-      document.getElementById('correctedCount').textContent = changedRows.size;
     }
-
-    updateStickyBar();
+    updateCounters();
+    updateInCardBar();
   }
 
-  function markValid(id) {
-    validatedRows.add(id);
-    const badge = document.getElementById('statusBadge-' + id);
-    badge.className = 'badge badge-success';
-    badge.textContent = '✅ Valid';
-    document.getElementById('validated').textContent = validatedRows.size;
-    updateStickyBar();
-  }
-
-  function updateStickyBar() {
-    const total = changedRows.size + validatedRows.size;
-    const sticky = document.getElementById('stickyActions');
-    if (total > 0) {
-      sticky.classList.remove('hidden');
-      document.getElementById('stickyInfo').textContent = total + ' baris diubah / divalidasi';
-    } else {
-      sticky.classList.add('hidden');
-    }
-  }
-
-  function bulkValidate() {
+  /* ── Setujui semua terpilih (tandai valid tanpa ubah label) ── */
+  function bulkSetujui() {
     const checked = document.querySelectorAll('.row-check:checked');
-    checked.forEach(cb => markValid(parseInt(cb.dataset.id)));
+    checked.forEach(cb => {
+      const id   = cb.dataset.id;
+      const badge = document.getElementById('statusBadge-' + id);
+      validatedRows.add(id);
+      badge.className   = 'badge badge-success';
+      badge.textContent = '✅ Valid';
+    });
+    updateCounters();
+    updateInCardBar();
+    clearSelection();
   }
 
+  /* ── Modal koreksi massal ── */
+  function bulkKoreksiModal() {
+    if (document.querySelectorAll('.row-check:checked').length === 0) return;
+    document.getElementById('koreksiModal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('koreksiModal').classList.remove('show');
+  }
+
+  function bulkSetLabel(label) {
+    const icons  = { rendah:'🟢 Rendah', sedang:'🟡 Sedang', tinggi:'🔴 Tinggi' };
+    document.querySelectorAll('.row-check:checked').forEach(cb => {
+      const id     = cb.dataset.id;
+      const select = document.querySelector(`.label-select[data-id="${id}"]`);
+      if (select) {
+        select.value = label;
+        onLabelChange(select);
+      }
+    });
+    closeModal();
+    clearSelection();
+  }
+
+  /* ── Select all / clear ── */
   function toggleSelectAll() {
     const all = document.getElementById('checkAll').checked;
-    document.querySelectorAll('.row-check').forEach(cb => cb.checked = all);
-    updateSelectedInfo();
+    document.querySelectorAll('.table-row:not([style*="display: none"]) .row-check')
+      .forEach(cb => { cb.checked = all; });
+    onCheckChange();
   }
 
-  document.querySelectorAll('.row-check').forEach(cb => {
-    cb.addEventListener('change', updateSelectedInfo);
-  });
-
-  function updateSelectedInfo() {
+  function onCheckChange() {
     const n = document.querySelectorAll('.row-check:checked').length;
-    document.getElementById('selectedInfo').textContent = n + ' baris dipilih';
+    const info = document.getElementById('selectedInfo');
+    info.style.display = n > 0 ? '' : 'none';
+    document.getElementById('selectedCount').textContent = n;
+    document.getElementById('btnSetujuiSemua').disabled  = n === 0;
+    document.getElementById('btnKoreksiSemua').disabled  = n === 0;
   }
 
+  function clearSelection() {
+    document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+    document.getElementById('checkAll').checked = false;
+    onCheckChange();
+  }
+
+  /* ── Counters ── */
+  function updateCounters() {
+    const nValidated = validatedRows.size;
+    const nCorrected = changedRows.size;
+    document.getElementById('statValidated').textContent = nValidated;
+    document.getElementById('statCorrected').textContent = nCorrected;
+    document.getElementById('statPending').textContent   =
+      Math.max(0, TOTAL - nValidated - nCorrected);
+    const pct = TOTAL > 0 ? Math.round((nValidated + nCorrected) / TOTAL * 100) : 0;
+    document.getElementById('pctValidasi').textContent = pct + '% selesai';
+  }
+
+  /* ── In-card action bar (bukan fixed, tidak menutupi pagination) ── */
+  function updateInCardBar() {
+    const total = changedRows.size + validatedRows.size;
+    const bar   = document.getElementById('inCardActions');
+    bar.style.display = total > 0 ? '' : 'none';
+    document.getElementById('inCardInfo').textContent =
+      total + ' perubahan belum disimpan';
+  }
+
+  /* ── Filter tabel ── */
   function filterTable() {
     const kategori = document.getElementById('filterKategori').value;
     const status   = document.getElementById('filterStatus').value;
     const search   = document.getElementById('searchInput').value.toLowerCase();
     let visible = 0;
-
     document.querySelectorAll('.table-row').forEach(row => {
-      const matchK = !kategori || row.dataset.kategori === kategori;
-      const matchS = !status   || row.dataset.status   === status;
-      const matchQ = !search   || row.dataset.hari.includes(search)
-                                || row.textContent.toLowerCase().includes(search);
-      row.style.display = (matchK && matchS && matchQ) ? '' : 'none';
-      if (matchK && matchS && matchQ) visible++;
+      const ok = (!kategori || row.dataset.kategori === kategori)
+              && (!status   || row.dataset.status   === status)
+              && (!search   || row.dataset.hari.includes(search)
+                            || row.textContent.toLowerCase().includes(search));
+      row.style.display = ok ? '' : 'none';
+      if (ok) visible++;
     });
-    document.getElementById('tableInfo').textContent = 'Menampilkan ' + visible + ' baris';
+    document.getElementById('tableInfo').textContent =
+      'Menampilkan ' + visible + ' baris';
   }
 
-  function switchTab(tab) {
+  /* ── Tab switch ── */
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
     document.getElementById('viewTable').style.display   = tab === 'table'   ? '' : 'none';
     document.getElementById('viewSummary').style.display = tab === 'summary' ? '' : 'none';
-    document.querySelectorAll('.tabs .tab').forEach((t,i) => {
-      t.classList.toggle('active', (tab === 'table' && i===0) || (tab === 'summary' && i===1));
-    });
-  }
-
-  function showDetail(id) {
-    alert('Detail baris #' + id + '\n(Modal detail akan diimplementasikan di Flask backend)');
   }
 
   function discardChanges() {
