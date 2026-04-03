@@ -1,181 +1,197 @@
 {% extends "base.html" %}
 
-{% block title %}Prediksi Manual{% endblock %}
-{% block page_title %}Prediksi Manual{% endblock %}
-{% block breadcrumb %}Prediksi Manual{% endblock %}
+{% block title %}Prediksi Kepadatan{% endblock %}
+{% block page_title %}Prediksi Kepadatan{% endblock %}
+{% block breadcrumb %}Prediksi Kepadatan{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
-  <h1>Prediksi Kepadatan Manual</h1>
-  <p>Masukkan data volume kendaraan secara manual untuk mendapatkan prediksi tingkat kepadatan secara instan.</p>
+  <h1>Prediksi Tingkat Kepadatan</h1>
+  <p>Masukkan hari, jam, dan interval menit untuk mendapatkan prediksi kepadatan lalu lintas.</p>
+</div>
+
+<!-- Info Banner -->
+<div class="alert alert-info fade-in" style="margin-bottom: 24px;">
+  <span class="alert-icon">💡</span>
+  <div class="alert-body">
+    <div class="alert-title">Fitur Demo Prediksi</div>
+    <div class="alert-desc">
+      Prediksi dihasilkan berdasarkan pola historis dataset yang telah terkumpul.
+      Tersedia untuk jam pengamatan <strong>06.00–09.00</strong> dan
+      <strong>15.00–20.00</strong> WIB sesuai periode rekaman CCTV.
+    </div>
+  </div>
 </div>
 
 <div class="grid grid-12 fade-in">
 
   <!-- ── FORM INPUT ── -->
-  <div class="col-span-7">
+  <div class="col-span-5">
     <div class="card fade-in delay-1">
       <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Input Data Kendaraan</div>
-        <div class="card-subtitle">Isi semua kolom sesuai hasil pengamatan / ekstraksi</div>
+        <div class="card-title"><span class="dot"></span>Input Waktu Pengamatan</div>
+        <div class="card-subtitle">Pilih hari, sesi, jam, dan menit</div>
       </div>
 
       <form method="POST" action="{{ url_for('prediksi') }}" id="prediksiForm">
-        {# {{{ form.hidden_tag() if form.hidden_tag is defined }}} #}
+        {#{{ form.hidden_tag() if form.hidden_tag is defined }}#}
 
-        <!-- Waktu Pengamatan -->
-        <div style="background:var(--bg-elevated);border-radius:var(--radius-md);padding:16px;margin-bottom:20px;">
-          <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
-            📅 Waktu Pengamatan
-          </div>
-          <div class="grid grid-3" style="gap:14px;">
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">Hari</label>
-              <select class="form-control" name="hari" id="inputHari" required>
-                <option value="">— Pilih Hari —</option>
-                {% for hari in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}
-                <option value="{{ hari }}" {{ 'selected' if form_data and form_data.hari == hari else '' }}>{{ hari }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">Jam (0–23)</label>
-              <input type="number" class="form-control" name="jam" id="inputJam"
-                     min="0" max="23" placeholder="cth: 7"
-                     value="{{ form_data.jam if form_data else '' }}" required />
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">Interval Menit</label>
-              <select class="form-control" name="menit" id="inputMenit" required>
-                <option value="">— Pilih —</option>
-                {% for m in [10,20,30,40,50,60] %}
-                <option value="{{ m }}" {{ 'selected' if form_data and form_data.menit|string == m|string else '' }}>+{{ m }} menit</option>
-                {% endfor %}
-              </select>
-            </div>
+        <!-- Hari -->
+        <div class="form-group">
+          <label class="form-label">Hari</label>
+          <select class="form-control" name="hari" id="inputHari" required>
+            <option value="">— Pilih Hari —</option>
+            {% for h in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}
+            <option value="{{ h }}"
+              {{ 'selected' if form_data is defined and form_data.hari == h else '' }}>
+              {{ h }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Sesi -->
+        <div class="form-group">
+          <label class="form-label">Sesi Pengamatan</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <label style="border:2px solid var(--border);border-radius:var(--radius-md);
+                          padding:12px 14px;cursor:pointer;transition:var(--transition);
+                          display:flex;flex-direction:column;gap:4px;"
+                   id="labelPagi" onclick="setSesi('pagi')">
+              <input type="radio" name="sesi" value="pagi" id="sesiPagi"
+                     style="display:none;" />
+              <span style="font-size:13px;font-weight:700;color:var(--text-heading);">🌅 Pagi</span>
+              <span style="font-size:11.5px;color:var(--text-muted);">06:00 – 09:00 WIB</span>
+            </label>
+            <label style="border:2px solid var(--border);border-radius:var(--radius-md);
+                          padding:12px 14px;cursor:pointer;transition:var(--transition);
+                          display:flex;flex-direction:column;gap:4px;"
+                   id="labelSore" onclick="setSesi('sore')">
+              <input type="radio" name="sesi" value="sore" id="sesiSore"
+                     style="display:none;" />
+              <span style="font-size:13px;font-weight:700;color:var(--text-heading);">🌆 Sore</span>
+              <span style="font-size:11.5px;color:var(--text-muted);">15:00 – 20:00 WIB</span>
+            </label>
           </div>
         </div>
 
-        <!-- Volume Kendaraan -->
-        <div style="background:var(--bg-elevated);border-radius:var(--radius-md);padding:16px;margin-bottom:20px;">
-          <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">
-            🚗 Volume Kendaraan
-          </div>
-          <div class="grid grid-2" style="gap:14px;">
-
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">
-                🏍️ Sepeda Motor
-              </label>
-              <input type="number" class="form-control" name="motor" id="inputMotor"
-                     min="0" placeholder="Jumlah motor"
-                     value="{{ form_data.motor if form_data else '' }}"
-                     oninput="updateTotal()" required />
-            </div>
-
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">
-                🚗 Mobil Penumpang
-              </label>
-              <input type="number" class="form-control" name="mobil" id="inputMobil"
-                     min="0" placeholder="Jumlah mobil"
-                     value="{{ form_data.mobil if form_data else '' }}"
-                     oninput="updateTotal()" required />
-            </div>
-
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">
-                🚌 Bus / Angkutan Umum
-              </label>
-              <input type="number" class="form-control" name="bus" id="inputBus"
-                     min="0" placeholder="Jumlah bus"
-                     value="{{ form_data.bus if form_data else '' }}"
-                     oninput="updateTotal()" required />
-            </div>
-
-            <div class="form-group" style="margin:0;">
-              <label class="form-label">
-                🚛 Truk / Kendaraan Berat
-              </label>
-              <input type="number" class="form-control" name="truk" id="inputTruk"
-                     min="0" placeholder="Jumlah truk"
-                     value="{{ form_data.truk if form_data else '' }}"
-                     oninput="updateTotal()" required />
-            </div>
-
-          </div>
-
-          <!-- Total Kendaraan (auto-calc) -->
-          <div style="margin-top:14px;padding:12px 16px;background:var(--bg-card);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:12.5px;color:var(--text-muted);">Total Kendaraan (otomatis)</span>
-            <span id="totalDisplay" style="font-family:var(--font-mono);font-size:22px;font-weight:500;color:var(--primary-light);">
-              {{ form_data.total_kendaraan if form_data else '0' }}
-            </span>
-          </div>
-          <input type="hidden" name="total_kendaraan" id="inputTotal" value="{{ form_data.total_kendaraan if form_data else '0' }}" />
-
+        <!-- Jam -->
+        <div class="form-group">
+          <label class="form-label">Jam</label>
+          <select class="form-control" name="jam" id="inputJam" required>
+            <option value="">— Pilih sesi dulu —</option>
+          </select>
+          <div class="form-hint">Pilihan jam menyesuaikan sesi yang dipilih</div>
         </div>
 
-        <!-- Model + Submit -->
-        <div class="grid grid-2" style="gap:14px;align-items:end;">
-          <div class="form-group" style="margin:0;">
-            <label class="form-label">Model Klasifikasi</label>
-            <select class="form-control" name="model_choice">
-              <option value="best" selected>🏆 Model Terbaik</option>
-              <option value="rf">🌲 Random Forest</option>
-              <option value="svm">⚙️ SVM</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-primary btn-lg w-full">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        <!-- Menit -->
+        <div class="form-group">
+          <label class="form-label">Menit (1–59)</label>
+          <div class="input-group">
+            <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
             </svg>
-            Prediksi Sekarang
-          </button>
+            <input
+              type="number"
+              class="form-control"
+              name="menit"
+              id="inputMenit"
+              min="1" max="59"
+              placeholder="cth: 22"
+              value="{{ form_data.menit if form_data is defined and form_data.menit else '' }}"
+              oninput="previewRounding(this.value)"
+              required
+            />
+          </div>
+          <div id="roundingHint" class="form-hint" style="margin-top:6px;min-height:18px;"></div>
+          <input type="hidden" name="menit_rounded" id="menitRounded" value="" />
         </div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full" id="btnPrediksi">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Prediksi Kepadatan
+        </button>
 
       </form>
     </div>
   </div>
 
-  <!-- ── RESULT PANEL ── -->
-  <div class="col-span-5">
+  <!-- ── HASIL PREDIKSI ── -->
+  <div class="col-span-7">
 
-    <!-- Hasil Prediksi -->
     <div class="card fade-in delay-2" style="margin-bottom: 20px;">
       <div class="card-header">
-        <div class="card-title"><span class="dot" style="background:var(--success);"></span>Hasil Prediksi</div>
+        <div class="card-title">
+          <span class="dot" style="background:var(--success);"></span>Hasil Prediksi
+        </div>
       </div>
 
-      {% if prediction %}
-      <!-- Ada Hasil -->
-      <div style="text-align:center;padding:16px 0 24px;">
-        <div style="
-          width:140px;height:140px;border-radius:50%;margin:0 auto 20px;
-          display:flex;flex-direction:column;align-items:center;justify-content:center;
-          background:var(--label-{{ prediction.label | lower }}-bg);
-          border:3px solid var(--label-{{ prediction.label | lower }});
-          box-shadow:0 0 40px var(--label-{{ prediction.label | lower }}-bg);
-          font-size:40px;
-        ">
-          {{ '🟢' if prediction.label == 'Rendah' else ('🟡' if prediction.label == 'Sedang' else '🔴') }}
-        </div>
-        <div style="font-size:28px;font-weight:800;color:var(--label-{{ prediction.label | lower }});margin-bottom:6px;">
-          {{ prediction.label | upper }}
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);">Tingkat Kepadatan Lalu Lintas</div>
+      {% if prediction is defined and prediction %}
+      <!-- Hasil dari Flask -->
+      {% set pred_label = prediction.label %}
+      {% set pred_hari  = prediction.hari %}
+      {% set pred_jam   = prediction.jam %}
+      {% set pred_menit = prediction.menit %}
+      {% set pred_proba = prediction.proba %}
+      {% else %}
+      <!-- Dummy default supaya UI terisi -->
+      {% set pred_label = 'Sedang' %}
+      {% set pred_hari  = 'Senin' %}
+      {% set pred_jam   = '07' %}
+      {% set pred_menit = '20' %}
+      {% set pred_proba = {'Rendah': 0.12, 'Sedang': 0.71, 'Tinggi': 0.17} %}
+      {% endif %}
 
-        <div style="margin-top:24px;padding:14px 20px;background:var(--bg-elevated);border-radius:var(--radius-md);">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.8px;">Probabilitas Kelas</div>
-          {% for cls, prob in prediction.proba.items() %}
+      <div style="display:flex;align-items:center;gap:28px;padding:12px 0;">
+
+        <!-- Indikator bulat -->
+        <div style="
+          width:130px;height:130px;border-radius:50%;flex-shrink:0;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          background:var(--label-{{ pred_label | lower }}-bg);
+          border:3px solid var(--label-{{ pred_label | lower }});
+          box-shadow:0 0 40px var(--label-{{ pred_label | lower }}-bg);
+          font-size:38px;
+        ">
+          {{ '🟢' if pred_label == 'Rendah' else ('🟡' if pred_label == 'Sedang' else '🔴') }}
+        </div>
+
+        <!-- Detail -->
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;
+                      letter-spacing:1px;margin-bottom:6px;">
+            Prediksi untuk
+            {{ pred_hari }}, {{ pred_jam }}:{{ pred_menit }} WIB
+          </div>
+          <div style="font-size:32px;font-weight:800;
+                      color:var(--label-{{ pred_label | lower }});margin-bottom:4px;">
+            {{ pred_label | upper }}
+          </div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">
+            Tingkat Kepadatan Lalu Lintas
+          </div>
+
+          <!-- Probabilitas -->
+          {% for cls, prob in pred_proba.items() %}
           <div style="margin-bottom:8px;">
             <div class="flex justify-between" style="font-size:12px;margin-bottom:3px;">
-              <span>{{ cls }}</span>
-              <span class="text-mono" style="color:var(--label-{{ cls | lower }});">{{ (prob * 100) | round(1) }}%</span>
+              <span style="color:var(--text-secondary);">{{ cls }}</span>
+              <span class="text-mono"
+                    style="color:var(--label-{{ cls | lower }});">
+                {{ (prob * 100) | round(1) }}%
+              </span>
             </div>
             <div class="progress-bar">
-              <div class="progress-fill {{ 'success' if cls == 'Rendah' else ('warning' if cls == 'Sedang' else 'danger') }}"
+              <div class="progress-fill
+                {{ 'success' if cls == 'Rendah' else
+                   ('warning' if cls == 'Sedang' else 'danger') }}"
                    style="width:{{ (prob * 100) | round(1) }}%;"></div>
             </div>
           </div>
@@ -183,72 +199,38 @@
         </div>
       </div>
 
-      {% else %}
-      <!-- Belum Ada Hasil -->
-      <div style="text-align:center;padding:40px 20px;">
-        <div style="font-size:52px;margin-bottom:16px;opacity:0.3;">🔍</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Belum Ada Prediksi</div>
-        <div style="font-size:12.5px;color:var(--text-muted);">Isi form di sebelah kiri dan klik<br>"Prediksi Sekarang" untuk memulai.</div>
-      </div>
-      {% endif %}
     </div>
 
-    <!-- Riwayat Prediksi -->
+    <!-- Panduan Kategori -->
     <div class="card fade-in delay-3">
-      <div class="card-header">
-        <div class="card-title"><span class="dot" style="background:var(--warning);"></span>Riwayat Prediksi</div>
-        <span style="font-size:12px;color:var(--text-muted);">Sesi ini</span>
+      <div class="card-title" style="margin-bottom:14px;">
+        <span class="dot" style="background:var(--info);"></span>
+        Panduan Kategori Kepadatan
       </div>
-
-      {% if history %}
-      {% for h in history[-5:]|reverse %}
-      <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:4px;padding:10px 0;">
-        <div class="flex w-full justify-between items-center">
-          <span style="font-size:12.5px;font-weight:600;">{{ h.hari }}, {{ h.jam }}:{{ h.menit }} WIB</span>
-          <span class="badge badge-{{ h.label | lower }}">{{ h.label }}</span>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for icon, label, color, bg, desc in [
+          ('🟢','RENDAH','var(--label-rendah)','var(--label-rendah-bg)',
+           'Arus bebas, kecepatan maksimal, tidak ada antrian.'),
+          ('🟡','SEDANG','var(--label-sedang)','var(--label-sedang-bg)',
+           'Arus stabil tapi jarak antar kendaraan mulai merapat, masih mengalir lancar.'),
+          ('🔴','TINGGI','var(--label-tinggi)','var(--label-tinggi-bg)',
+           'Arus tidak stabil, kecepatan rendah, sering stop-and-go, antrian signifikan.'),
+        ] %}
+        <div style="display:flex;align-items:center;gap:12px;
+                    padding:12px 16px;background:{{ bg }};
+                    border-radius:var(--radius-md);border-left:3px solid {{ color }};">
+          <span style="font-size:20px;">{{ icon }}</span>
+          <div>
+            <div style="font-size:12px;font-weight:800;color:{{ color }};margin-bottom:2px;">
+              {{ label }}
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);">{{ desc }}</div>
+          </div>
         </div>
-        <span style="font-size:11.5px;color:var(--text-muted);">
-          Motor:{{ h.motor }} · Mobil:{{ h.mobil }} · Bus:{{ h.bus }} · Truk:{{ h.truk }} · Total:{{ h.total }}
-        </span>
+        {% endfor %}
       </div>
-      {% endfor %}
-      {% else %}
-      <!-- Placeholder history -->
-      {% for item in [
-        ('Senin', '07', '10', 'Tinggi'),
-        ('Senin', '06', '50', 'Sedang'),
-        ('Senin', '06', '40', 'Rendah'),
-      ] %}
-      <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:4px;padding:10px 0;">
-        <div class="flex w-full justify-between items-center">
-          <span style="font-size:12.5px;font-weight:600;">{{ item[0] }}, {{ item[1] }}:{{ item[2] }} WIB</span>
-          <span class="badge badge-{{ item[3] | lower }}">{{ item[3] }}</span>
-        </div>
-        <span style="font-size:11.5px;color:var(--text-muted);">Contoh data historis</span>
-      </div>
-      {% endfor %}
-      {% endif %}
-
     </div>
 
-  </div>
-
-</div>
-
-<!-- Insight Box -->
-<div class="card fade-in delay-4" style="margin-top: 20px;">
-  <div class="card-title" style="margin-bottom: 12px;"><span class="dot" style="background:var(--info);"></span>ℹ️ Panduan Kategori Kepadatan</div>
-  <div class="grid grid-3" style="gap:14px;">
-    {% for icon, label, color, bg, desc in [
-      ('🟢','RENDAH','var(--label-rendah)','var(--label-rendah-bg)','Arus bebas, kecepatan maksimal, tidak ada antrian. Volume jauh di bawah kapasitas jalan.'),
-      ('🟡','SEDANG','var(--label-sedang)','var(--label-sedang-bg)','Arus stabil namun jarak antar kendaraan mulai merapat. Volume meningkat namun masih mengalir lancar.'),
-      ('🔴','TINGGI','var(--label-tinggi)','var(--label-tinggi-bg)','Arus tidak stabil, kecepatan sangat rendah, sering stop-and-go. Volume mendekati/melebihi kapasitas.'),
-    ] %}
-    <div style="padding:14px 16px;background:{{ bg }};border-radius:var(--radius-md);border:1px solid {{ color }}33;">
-      <div style="font-size:13px;font-weight:800;color:{{ color }};margin-bottom:6px;">{{ icon }} {{ label }}</div>
-      <div style="font-size:12px;color:var(--text-secondary);">{{ desc }}</div>
-    </div>
-    {% endfor %}
   </div>
 </div>
 
@@ -256,17 +238,85 @@
 
 {% block extra_scripts %}
 <script>
-  function updateTotal() {
-    const motor = parseInt(document.getElementById('inputMotor').value) || 0;
-    const mobil = parseInt(document.getElementById('inputMobil').value) || 0;
-    const bus   = parseInt(document.getElementById('inputBus').value)   || 0;
-    const truk  = parseInt(document.getElementById('inputTruk').value)  || 0;
-    const total = motor + mobil + bus + truk;
-    document.getElementById('totalDisplay').textContent = total.toLocaleString();
-    document.getElementById('inputTotal').value = total;
+  const jamPagi = ['06','07','08'];
+  const jamSore = ['15','16','17','18','19'];
+
+  function setSesi(sesi) {
+    const lPagi = document.getElementById('labelPagi');
+    const lSore = document.getElementById('labelSore');
+    if (sesi === 'pagi') {
+      lPagi.style.borderColor = 'var(--primary)';
+      lPagi.style.background  = 'var(--primary-glow)';
+      lSore.style.borderColor = 'var(--border)';
+      lSore.style.background  = 'transparent';
+      document.getElementById('sesiPagi').checked = true;
+    } else {
+      lSore.style.borderColor = 'var(--primary)';
+      lSore.style.background  = 'var(--primary-glow)';
+      lPagi.style.borderColor = 'var(--border)';
+      lPagi.style.background  = 'transparent';
+      document.getElementById('sesiSore').checked = true;
+    }
+    updateJamOptions(sesi);
   }
 
-  document.getElementById('prediksiForm').addEventListener('submit', function() {
+  function updateJamOptions(sesi) {
+    const sel  = document.getElementById('inputJam');
+    const opts = sesi === 'pagi' ? jamPagi : jamSore;
+    sel.innerHTML = opts
+      .map(h => `<option value="${h}">${h}:00 WIB</option>`)
+      .join('');
+  }
+
+  {% if form_data is defined and form_data.sesi %}
+  setSesi('{{ form_data.sesi }}');
+  {% if form_data.jam %}
+  document.getElementById('inputJam').value = '{{ form_data.jam }}';
+  {% endif %}
+  {% endif %}
+
+  /* ── Pembulatan menit ke bawah ke kelipatan 10 ── */
+  function roundDownTo10(val) {
+    const n = parseInt(val);
+    if (isNaN(n) || n < 1) return null;
+    // Bulatkan ke bawah ke kelipatan 10, minimum 10
+    return Math.max(10, Math.floor(n / 10) * 10);
+  }
+
+  function previewRounding(val) {
+    const hint    = document.getElementById('roundingHint');
+    const rounded = roundDownTo10(val);
+    if (rounded === null || val === '') {
+      hint.textContent = '';
+      hint.style.color = 'var(--text-muted)';
+      document.getElementById('menitRounded').value = '';
+      return;
+    }
+    const n = parseInt(val);
+    document.getElementById('menitRounded').value = rounded;
+    if (n === rounded) {
+      hint.innerHTML = `<span style="color:var(--success);">✓ Interval tepat: <strong>menit ke-${rounded}</strong></span>`;
+    } else {
+      hint.innerHTML = `<span style="color:var(--warning);">⟶ Akan dibulatkan ke <strong>menit ke-${rounded}</strong> (interval terdekat)</span>`;
+    }
+  }
+
+  document.getElementById('prediksiForm').addEventListener('submit', function (e) {
+    const sesi = document.querySelector('input[name="sesi"]:checked');
+    if (!sesi) {
+      alert('Silakan pilih sesi waktu terlebih dahulu (Pagi atau Sore).');
+      e.preventDefault();
+      return;
+    }
+    const menitVal = document.getElementById('inputMenit').value;
+    const rounded  = roundDownTo10(menitVal);
+    if (!rounded) {
+      alert('Masukkan menit yang valid (1–59).');
+      e.preventDefault();
+      return;
+    }
+    // Pastikan hidden field terisi sebelum submit
+    document.getElementById('menitRounded').value = rounded;
     document.getElementById('loadingOverlay').classList.remove('hidden');
     document.getElementById('loadingText').textContent = 'Memproses prediksi...';
   });
