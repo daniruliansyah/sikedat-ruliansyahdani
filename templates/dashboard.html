@@ -16,30 +16,20 @@
 </div>
 
 <!-- ── FILTER BAR ── -->
-<div class="card fade-in" style="margin-bottom: 20px; padding: 16px 20px;">
+<div class="card fade-in" style="margin-bottom: 20px; padding: 14px 20px;">
   <div class="flex items-center gap-3 flex-wrap">
-    <div style="flex:1;min-width:160px;">
-      <label class="form-label" style="margin-bottom:4px;">Rentang Tanggal</label>
-      <input type="date" class="form-control form-control-sm" name="date_from"
-             value="{{ date_from | default('2025-11-01') }}" />
-    </div>
-    <div style="padding-top: 22px; color: var(--text-muted);">—</div>
-    <div style="flex:1;min-width:160px;">
-      <label class="form-label" style="margin-bottom:4px;">&nbsp;</label>
-      <input type="date" class="form-control" name="date_to"
-             value="{{ date_to | default('2025-11-21') }}" />
-    </div>
-    <div style="min-width:160px;">
+    <div style="min-width:150px;">
       <label class="form-label" style="margin-bottom:4px;">Hari</label>
-      <select class="form-control" name="filter_day">
+      <select class="form-control" id="filterDay">
         <option value="">Semua Hari</option>
-        <option>Senin</option><option>Selasa</option><option>Rabu</option>
-        <option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option>
+        {% for h in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}
+        <option>{{ h }}</option>
+        {% endfor %}
       </select>
     </div>
-    <div style="min-width:160px;">
+    <div style="min-width:150px;">
       <label class="form-label" style="margin-bottom:4px;">Kategori</label>
-      <select class="form-control" name="filter_kategori">
+      <select class="form-control" id="filterKategori">
         <option value="">Semua Kategori</option>
         <option value="rendah">Rendah</option>
         <option value="sedang">Sedang</option>
@@ -47,57 +37,55 @@
       </select>
     </div>
     <div style="padding-top:22px;">
-      <button class="btn btn-primary" onclick="applyFilter()">Terapkan Filter</button>
-      <button class="btn btn-ghost" onclick="resetFilter()">Reset</button>
+      <button class="btn btn-primary" onclick="applyFilter()">Terapkan</button>
+      <button class="btn btn-ghost"
+              onclick="location.href='{{ url_for('dashboard') }}'">Reset</button>
     </div>
   </div>
 </div>
 
-<!-- ── ROW 1: Summary Stats ── -->
+<!-- ── STAT CARDS ── -->
 <div class="grid grid-4 fade-in" style="margin-bottom: 20px;">
-
   <div class="stat-card fade-in delay-1">
     <span class="stat-icon">📦</span>
     <div class="stat-label">Total Observasi</div>
     <div class="stat-value">{{ total_obs | default('1,008') }}</div>
     <div class="stat-meta">21 hari × 48 interval</div>
   </div>
-
   <div class="stat-card success fade-in delay-2">
     <span class="stat-icon">🟢</span>
     <div class="stat-label">Rendah</div>
     <div class="stat-value">{{ count_rendah | default('302') }}</div>
-    <div class="stat-meta">{{ pct_rendah | default('30') }}% dari total observasi</div>
+    <div class="stat-meta">{{ pct_rendah | default('30') }}% dari total</div>
   </div>
-
   <div class="stat-card warning fade-in delay-3">
     <span class="stat-icon">🟡</span>
     <div class="stat-label">Sedang</div>
     <div class="stat-value">{{ count_sedang | default('412') }}</div>
-    <div class="stat-meta">{{ pct_sedang | default('41') }}% dari total observasi</div>
+    <div class="stat-meta">{{ pct_sedang | default('41') }}% dari total</div>
   </div>
-
   <div class="stat-card danger fade-in delay-4">
     <span class="stat-icon">🔴</span>
     <div class="stat-label">Tinggi</div>
     <div class="stat-value">{{ count_tinggi | default('294') }}</div>
-    <div class="stat-meta">{{ pct_tinggi | default('29') }}% dari total observasi</div>
+    <div class="stat-meta">{{ pct_tinggi | default('29') }}% dari total</div>
   </div>
-
 </div>
 
-<!-- ── ROW 2: Pola Per Jam + Distribusi Kelas ── -->
+<!-- ── ROW 2: Per Jam + Distribusi ── -->
 <div class="grid grid-12 fade-in delay-1" style="margin-bottom: 20px;">
 
   <div class="card col-span-8">
     <div class="card-header">
       <div>
-        <div class="card-title"><span class="dot"></span>Pola Kepadatan per Jam (Rata-Rata)</div>
-        <div class="card-subtitle">Rata-rata jumlah kendaraan per jam selama 21 hari pengamatan</div>
+        <div class="card-title">
+          <span class="dot"></span>Rata-rata Volume Kendaraan per Jam
+        </div>
+        <div class="card-subtitle">Jam pengamatan: 06.00–09.00 &amp; 15.00–20.00</div>
       </div>
       <div class="tabs">
-        <button class="tab active" onclick="switchChartView('avg')">Rata-rata</button>
-        <button class="tab" onclick="switchChartView('max')">Puncak</button>
+        <button class="tab active" onclick="switchChart('avg',this)">Rata-rata</button>
+        <button class="tab" onclick="switchChart('max',this)">Tertinggi</button>
       </div>
     </div>
     <div class="chart-container" style="height: 240px;">
@@ -107,10 +95,12 @@
 
   <div class="card col-span-4">
     <div class="card-header">
-      <div class="card-title"><span class="dot" style="background:var(--cyan);"></span>Distribusi Kelas</div>
-      <div class="card-subtitle">Proporsi kategori kepadatan</div>
+      <div class="card-title">
+        <span class="dot" style="background:var(--cyan);"></span>Distribusi Kelas
+      </div>
+      <div class="card-subtitle">Proporsi kepadatan</div>
     </div>
-    <div class="chart-container" style="height:180px;margin-bottom:12px;">
+    <div class="chart-container" style="height:170px;margin-bottom:14px;">
       <canvas id="chartDistribusi"></canvas>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
@@ -121,7 +111,8 @@
       ] %}
       <div class="flex items-center justify-between" style="font-size:12.5px;">
         <div class="flex items-center gap-2">
-          <span style="width:10px;height:10px;border-radius:2px;background:{{ color }};display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:2px;
+                       background:{{ color }};display:inline-block;"></span>
           {{ label }}
         </div>
         <div class="flex items-center gap-2">
@@ -135,25 +126,27 @@
 
 </div>
 
-<!-- ── ROW 3: Weekday vs Weekend + Komposisi Kendaraan ── -->
+<!-- ── ROW 3: Weekday vs Weekend + Komposisi per Jam ── -->
 <div class="grid grid-2 fade-in delay-2" style="margin-bottom: 20px;">
 
-  <!-- Weekday vs Weekend -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title"><span class="dot" style="background:var(--warning);"></span>Weekday vs Weekend</div>
-      <div class="card-subtitle">Perbandingan rata-rata volume kendaraan</div>
+      <div class="card-title">
+        <span class="dot" style="background:var(--warning);"></span>Weekday vs Weekend
+      </div>
+      <div class="card-subtitle">Rata-rata volume per jam</div>
     </div>
     <div class="chart-container" style="height: 220px;">
       <canvas id="chartWeekday"></canvas>
     </div>
   </div>
 
-  <!-- Komposisi Kendaraan per Jam -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title"><span class="dot" style="background:var(--success);"></span>Komposisi Kendaraan per Jam</div>
-      <div class="card-subtitle">Perbandingan jenis kendaraan berdasarkan waktu</div>
+      <div class="card-title">
+        <span class="dot" style="background:var(--success);"></span>Komposisi Kendaraan per Jam
+      </div>
+      <div class="card-subtitle">Proporsi jenis kendaraan per jam</div>
     </div>
     <div class="chart-container" style="height: 220px;">
       <canvas id="chartKomposisiJam"></canvas>
@@ -162,47 +155,55 @@
 
 </div>
 
-<!-- ── ROW 4: Heavy Vehicle Mix + Peak Hours ── -->
+<!-- ── ROW 4: Rasio Kendaraan Berat + Top 10 Volume ── -->
 <div class="grid grid-12 fade-in delay-3" style="margin-bottom: 20px;">
 
   <!-- Rasio Kendaraan Berat -->
-  <div class="card col-span-5">
+  <div class="card col-span-4">
     <div class="card-header">
-      <div class="card-title"><span class="dot" style="background:var(--danger);"></span>Rasio Kendaraan Berat</div>
-      <div class="card-subtitle">Persentase Bus + Truk terhadap total kendaraan</div>
+      <div class="card-title">
+        <span class="dot" style="background:var(--danger);"></span>Rasio Kendaraan Berat
+      </div>
+      <div class="card-subtitle">% Bus + Truk dari total kendaraan</div>
     </div>
-
-    <div style="text-align:center;padding:20px 0;">
+    <div style="text-align:center;padding:16px 0 20px;">
       <div style="position:relative;display:inline-block;">
-        <canvas id="chartHeavy" width="180" height="180"></canvas>
-        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);text-align:center;">
-          <div style="font-family:var(--font-mono);font-size:28px;font-weight:500;color:var(--text-heading);">
-            {{ heavy_pct | default('11') }}%
+        <canvas id="chartHeavy" width="160" height="160"></canvas>
+        <div style="position:absolute;top:50%;left:50%;
+                    transform:translate(-50%,-55%);text-align:center;">
+          <div style="font-family:var(--font-mono);font-size:26px;
+                      font-weight:500;color:var(--text-heading);">
+            {{ heavy_pct | default(11) }}%
           </div>
           <div style="font-size:11px;color:var(--text-muted);">Kendaraan Berat</div>
         </div>
       </div>
     </div>
-
     <div class="kv-pair">
-      <span class="key">🚌 Bus</span>
-      <span class="val" style="color:var(--success);">{{ bus_pct | default('7') }}%</span>
+      <span class="key">🚌 Rata-rata Bus / interval</span>
+      <span class="val" style="color:var(--success);">{{ avg_bus | default('4.5') }}</span>
     </div>
     <div class="kv-pair">
-      <span class="key">🚛 Truk</span>
-      <span class="val" style="color:var(--warning);">{{ truk_pct | default('4') }}%</span>
+      <span class="key">🚛 Rata-rata Truk / interval</span>
+      <span class="val" style="color:var(--warning);">{{ avg_truk | default('2.7') }}</span>
     </div>
     <div class="kv-pair" style="border:none;">
-      <span class="key">Rata-rata per interval</span>
-      <span class="val">{{ avg_heavy | default('7.8') }} unit</span>
+      <span class="key">Total kendaraan berat</span>
+      <span class="val">{{ total_heavy | default('7,340') }}</span>
     </div>
   </div>
 
-  <!-- Peak Hours Table -->
-  <div class="card col-span-7">
+  <!-- Top 10 Interval Volume Tertinggi -->
+  <div class="card col-span-8">
     <div class="card-header">
-      <div class="card-title"><span class="dot" style="background:var(--primary);"></span>Jam Puncak Kepadatan (Top 10)</div>
-      <div class="card-subtitle">Interval dengan frekuensi kepadatan "Tinggi" terbanyak</div>
+      <div class="card-title">
+        <span class="dot" style="background:var(--primary);"></span>
+        Top 10 Interval dengan Volume Tertinggi
+      </div>
+      <div class="card-subtitle">
+        Berdasarkan kolom
+        <span class="text-mono">total_kendaraan</span> tertinggi dalam dataset
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -210,37 +211,38 @@
         <thead>
           <tr>
             <th>Rank</th><th>Hari</th><th>Jam</th><th>Menit</th>
-            <th>Avg. Kendaraan</th><th>Frek. Tinggi</th><th>Dominan</th>
+            <th>Motor</th><th>Mobil</th><th>Bus</th><th>Truk</th>
+            <th>Total</th><th>Kategori</th>
           </tr>
         </thead>
         <tbody>
-          {% set peak_data = peak_hours | default([
-            ('Senin',   '07', '10', 105, 18, 'Tinggi'),
-            ('Jumat',   '07', '20', 102, 17, 'Tinggi'),
-            ('Rabu',    '07', '10', 98,  16, 'Tinggi'),
-            ('Senin',   '17', '30', 97,  15, 'Tinggi'),
-            ('Selasa',  '07', '30', 95,  14, 'Tinggi'),
-            ('Kamis',   '17', '20', 93,  13, 'Tinggi'),
-            ('Jumat',   '17', '10', 91,  12, 'Tinggi'),
-            ('Rabu',    '17', '40', 88,  11, 'Sedang'),
-            ('Sabtu',   '08', '00', 85,  10, 'Sedang'),
-            ('Minggu',  '17', '00', 80,   8, 'Sedang'),
+          {% set top_data = top_volume | default([
+            {'hari':'Jumat',   'jam':7,  'menit':20, 'motor':85,'mobil':24,'bus':6,'truk':4, 'total':119,'kategori':'tinggi'},
+            {'hari':'Senin',   'jam':7,  'menit':10, 'motor':82,'mobil':22,'bus':7,'truk':3, 'total':114,'kategori':'tinggi'},
+            {'hari':'Rabu',    'jam':7,  'menit':30, 'motor':79,'mobil':21,'bus':6,'truk':5, 'total':111,'kategori':'tinggi'},
+            {'hari':'Selasa',  'jam':17, 'menit':20, 'motor':78,'mobil':20,'bus':7,'truk':4, 'total':109,'kategori':'tinggi'},
+            {'hari':'Kamis',   'jam':7,  'menit':20, 'motor':76,'mobil':21,'bus':5,'truk':4, 'total':106,'kategori':'tinggi'},
+            {'hari':'Jumat',   'jam':17, 'menit':10, 'motor':75,'mobil':20,'bus':6,'truk':3, 'total':104,'kategori':'tinggi'},
+            {'hari':'Senin',   'jam':17, 'menit':30, 'motor':73,'mobil':19,'bus':6,'truk':4, 'total':102,'kategori':'tinggi'},
+            {'hari':'Rabu',    'jam':17, 'menit':40, 'motor':70,'mobil':18,'bus':5,'truk':4, 'total':97, 'kategori':'sedang'},
+            {'hari':'Sabtu',   'jam':8,  'menit':10, 'motor':68,'mobil':17,'bus':5,'truk':3, 'total':93, 'kategori':'sedang'},
+            {'hari':'Minggu',  'jam':17, 'menit':10, 'motor':64,'mobil':16,'bus':4,'truk':3, 'total':87, 'kategori':'sedang'},
           ]) %}
-          {% for item in peak_data %}
-          {% if item | length == 6 %}
-          {% set hari, jam, menit, avg, frek, dom = item %}
-          {% else %}
-          {% set hari, jam, menit, avg, frek, dom = item.hari, item.jam, item.menit, item.avg, item.frek, item.dom %}
-          {% endif %}
+          {% for row in top_data %}
           <tr>
             <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
-            <td>{{ hari }}</td>
-            <td class="td-mono">{{ jam }}:00</td>
-            <td class="td-mono">+{{ menit }} mnt</td>
-            <td class="td-mono" style="color:var(--primary-light);">{{ avg }}</td>
-            <td class="td-mono" style="color:var(--danger);">{{ frek }}×</td>
+            <td>{{ row.hari }}</td>
+            <td class="td-mono">{{ row.jam }}:00</td>
+            <td class="td-mono">+{{ row.menit }} mnt</td>
+            <td class="td-mono" style="color:var(--primary-light);">{{ row.motor }}</td>
+            <td class="td-mono" style="color:var(--cyan);">{{ row.mobil }}</td>
+            <td class="td-mono" style="color:var(--success);">{{ row.bus }}</td>
+            <td class="td-mono" style="color:var(--warning);">{{ row.truk }}</td>
+            <td class="td-mono" style="font-weight:700;font-size:14px;">{{ row.total }}</td>
             <td>
-              <span class="badge badge-{{ dom | lower }}">{{ dom }}</span>
+              <span class="badge badge-{{ row.kategori }}">
+                <span class="dot"></span>{{ row.kategori | capitalize }}
+              </span>
             </td>
           </tr>
           {% endfor %}
@@ -251,19 +253,23 @@
 
 </div>
 
-<!-- ── ROW 5: Heatmap Kepadatan ── -->
+<!-- ── ROW 5: Heatmap ── -->
 <div class="card fade-in delay-4" style="margin-bottom: 20px;">
   <div class="card-header">
-    <div class="card-title"><span class="dot" style="background:var(--cyan);"></span>Heatmap Kepadatan — Hari × Jam</div>
-    <div class="card-subtitle">Intensitas rata-rata jumlah kendaraan per sel (hari × jam pengamatan)</div>
+    <div class="card-title">
+      <span class="dot" style="background:var(--cyan);"></span>
+      Heatmap Volume — Hari × Jam Pengamatan
+    </div>
+    <div class="card-subtitle">Rata-rata total kendaraan per sel (hari × jam)</div>
   </div>
   <div id="heatmapContainer" style="overflow-x:auto;">
-    <div id="heatmap" style="min-width:600px;"></div>
+    <div id="heatmap"></div>
   </div>
   <div class="flex items-center gap-3 mt-3" style="font-size:12px;">
-    <span style="color:var(--text-muted);">Rendah</span>
-    <div style="width:200px;height:8px;border-radius:4px;background:linear-gradient(to right, #0F2240, #1A6FFF, #EF4444);"></div>
-    <span style="color:var(--text-muted);">Tinggi</span>
+    <span style="color:var(--text-muted);">Volume Rendah</span>
+    <div style="width:200px;height:8px;border-radius:4px;
+                background:linear-gradient(to right,#0F2240,#1A6FFF,#EF4444);"></div>
+    <span style="color:var(--text-muted);">Volume Tinggi</span>
   </div>
 </div>
 
@@ -275,71 +281,64 @@
   Chart.defaults.font.family = "'DM Mono', monospace";
   Chart.defaults.font.size = 11;
 
-  const JAM_LABELS = ['06:00','06:10','06:20','06:30','06:40','06:50','07:00','07:10','07:20','07:30',
-                      '07:40','07:50','08:00','08:10','08:20','08:30','08:40','08:50',
-                      '15:00','15:10','15:20','15:30','15:40','15:50','16:00','16:10','16:20','16:30',
-                      '16:40','16:50','17:00','17:10','17:20','17:30','17:40','17:50',
-                      '18:00','18:10','18:20','18:30','18:40','18:50','19:00','19:10','19:20','19:30',
-                      '19:40','19:50'];
+  const JAM_DISPLAY = ['06:xx','07:xx','08:xx','15:xx','16:xx','17:xx','18:xx','19:xx'];
 
-  const avgData = {{ avg_per_jam | default([
-    32,38,44,52,65,80,98,105,102,95,88,78,70,62,55,48,42,38,
-    45,55,65,75,88,98,105,110,102,95,88,78,72,65,58,52,46,40,
-    35,30,28,26,24,22,20,19,18,17,16,15
-  ]) | tojson }};
+  /* ── Dummy data (diganti Flask saat data nyata tersedia) ── */
+  const avgData = {{ avg_per_jam | default([38,92,68,42,65,88,55,22]) | tojson }};
+  const maxData = {{ max_per_jam | default([52,119,95,60,88,110,72,38]) | tojson }};
 
-  const maxData = {{ max_per_jam | default([
-    45,52,60,72,85,98,118,128,122,115,105,92,84,76,68,60,54,48,
-    58,68,82,94,108,118,128,135,125,115,106,94,88,80,72,65,58,52,
-    46,40,35,32,30,28,25,24,23,22,21,20
-  ]) | tojson }};
-
-  // Chart Per Jam
-  let chartPerJam = new Chart(document.getElementById('chartPerJam'), {
-    type: 'bar',
-    data: {
-      labels: JAM_LABELS,
-      datasets: [{
-        label: 'Rata-rata Kendaraan',
-        data: avgData,
-        backgroundColor: avgData.map(v =>
-          v >= 95 ? 'rgba(239,68,68,0.75)' :
-          v >= 60 ? 'rgba(245,158,11,0.75)' :
-                    'rgba(26,111,255,0.6)'
-        ),
-        borderRadius: 4,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+  /* ── Chart Per Jam ── */
+  const perJamChart = new Chart(
+    document.getElementById('chartPerJam').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: JAM_DISPLAY,
+        datasets: [{
+          label: 'Rata-rata Kendaraan',
+          data: avgData,
+          backgroundColor: avgData.map(v =>
+            v >= 90 ? 'rgba(239,68,68,0.78)' :
+            v >= 55 ? 'rgba(245,158,11,0.78)' :
+                      'rgba(26,111,255,0.68)'
+          ),
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+        }
       }
     }
-  });
+  );
 
-  function switchChartView(type) {
-    document.querySelectorAll('.tabs .tab').forEach((t,i) => {
-      t.classList.toggle('active', (type === 'avg' && i===0) || (type === 'max' && i===1));
-    });
-    chartPerJam.data.datasets[0].data = type === 'avg' ? avgData : maxData;
-    chartPerJam.data.datasets[0].label = type === 'avg' ? 'Rata-rata' : 'Puncak';
-    chartPerJam.update();
+  function switchChart(type, btn) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const d = type === 'avg' ? avgData : maxData;
+    perJamChart.data.datasets[0].data = d;
+    perJamChart.data.datasets[0].backgroundColor = d.map(v =>
+      v >= 90 ? 'rgba(239,68,68,0.78)' :
+      v >= 55 ? 'rgba(245,158,11,0.78)' :
+                'rgba(26,111,255,0.68)'
+    );
+    perJamChart.data.datasets[0].label = type === 'avg' ? 'Rata-rata' : 'Tertinggi';
+    perJamChart.update();
   }
 
-  // Chart Distribusi
-  new Chart(document.getElementById('chartDistribusi'), {
+  /* ── Distribusi ── */
+  new Chart(document.getElementById('chartDistribusi').getContext('2d'), {
     type: 'doughnut',
     data: {
       labels: ['Rendah','Sedang','Tinggi'],
       datasets: [{
-        data: [{{ pct_rendah|default(30) }}, {{ pct_sedang|default(41) }}, {{ pct_tinggi|default(29) }}],
+        data: [{{ pct_rendah|default(30) }},{{ pct_sedang|default(41) }},{{ pct_tinggi|default(29) }}],
         backgroundColor: ['#10C981','#F59E0B','#EF4444'],
-        borderWidth: 0,
-        hoverOffset: 6
+        borderWidth: 0, hoverOffset: 6
       }]
     },
     options: {
@@ -348,23 +347,24 @@
     }
   });
 
-  // Weekday vs Weekend
-  const wdLabels = ['06','07','08','15','16','17','18','19'];
-  new Chart(document.getElementById('chartWeekday'), {
+  /* ── Weekday vs Weekend ── */
+  new Chart(document.getElementById('chartWeekday').getContext('2d'), {
     type: 'line',
     data: {
-      labels: wdLabels.map(h => h+':00'),
+      labels: JAM_DISPLAY,
       datasets: [
         {
-          label: 'Weekday (Sen-Jum)',
-          data: {{ weekday_avg | default([38,92,68,55,88,105,72,28]) | tojson }},
-          borderColor: '#1A6FFF', backgroundColor: 'rgba(26,111,255,0.08)',
+          label: 'Weekday (Sen–Jum)',
+          data: {{ weekday_avg | default([38,92,68,42,65,88,55,22]) | tojson }},
+          borderColor: '#1A6FFF',
+          backgroundColor: 'rgba(26,111,255,0.08)',
           borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 3
         },
         {
-          label: 'Weekend (Sab-Min)',
-          data: {{ weekend_avg | default([25,48,55,62,78,72,48,22]) | tojson }},
-          borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.07)',
+          label: 'Weekend (Sab–Min)',
+          data: {{ weekend_avg | default([25,48,55,38,58,72,40,16]) | tojson }},
+          borderColor: '#F59E0B',
+          backgroundColor: 'rgba(245,158,11,0.07)',
           borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 3
         }
       ]
@@ -379,16 +379,16 @@
     }
   });
 
-  // Komposisi per Jam (Stacked Bar)
-  new Chart(document.getElementById('chartKomposisiJam'), {
+  /* ── Komposisi per Jam (Stacked) ── */
+  new Chart(document.getElementById('chartKomposisiJam').getContext('2d'), {
     type: 'bar',
     data: {
-      labels: wdLabels.map(h => h+':00'),
+      labels: JAM_DISPLAY,
       datasets: [
-        { label: 'Motor',  data: {{ motor_per_jam|default([22,62,46,36,60,70,48,18])|tojson }}, backgroundColor: '#1A6FFF' },
-        { label: 'Mobil',  data: {{ mobil_per_jam|default([10,20,16,12,18,24,16,7])|tojson }},  backgroundColor: '#00C4FF' },
-        { label: 'Bus',    data: {{ bus_per_jam|default([3,5,4,4,6,7,5,2])|tojson }},           backgroundColor: '#10C981' },
-        { label: 'Truk',   data: {{ truk_per_jam|default([3,5,2,3,4,4,3,1])|tojson }},          backgroundColor: '#F59E0B' },
+        { label:'Motor', data:{{ motor_per_jam|default([22,62,46,28,44,58,36,14])|tojson }}, backgroundColor:'#1A6FFF' },
+        { label:'Mobil', data:{{ mobil_per_jam|default([10,20,16,10,14,20,13,6])|tojson }},  backgroundColor:'#00C4FF' },
+        { label:'Bus',   data:{{ bus_per_jam|default([3,6,4,2,4,6,4,1])|tojson }},           backgroundColor:'#10C981' },
+        { label:'Truk',  data:{{ truk_per_jam|default([3,4,2,2,3,4,2,1])|tojson }},          backgroundColor:'#F59E0B' },
       ]
     },
     options: {
@@ -401,13 +401,13 @@
     }
   });
 
-  // Heavy Vehicle Gauge
+  /* ── Heavy Vehicle Gauge ── */
   new Chart(document.getElementById('chartHeavy'), {
     type: 'doughnut',
     data: {
       datasets: [{
         data: [{{ heavy_pct|default(11) }}, {{ 100 - heavy_pct|default(11) }}],
-        backgroundColor: ['#EF4444', 'rgba(255,255,255,0.05)'],
+        backgroundColor: ['#EF4444','rgba(255,255,255,0.05)'],
         borderWidth: 0
       }]
     },
@@ -417,51 +417,64 @@
     }
   });
 
-  // Heatmap
-  const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+  /* ── Heatmap ── */
+  const days  = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
   const hours = ['06','07','08','15','16','17','18','19'];
-  const heatData = {{ heatmap_data | default([
-    [38,95,68,0,0,0,0,0, 42,100,72,0,0,0,0,0, 40,98,65,0,0,0,0,0,
-     36,92,62,0,0,0,0,0, 45,105,70,0,0,0,0,0, 25,50,55,60,72,48,30,18,
-     22,40,52,58,65,40,25,15],
-  ]) | tojson }};
+  const heatFromFlask = {{ heatmap_data | default({}) | tojson }};
 
-  const heatContainer = document.getElementById('heatmap');
-  const cellSize = 42;
-  const maxVal = 120;
+  /* Dummy jika tidak ada data dari Flask */
+  const dummyHeat = {};
+  days.forEach(d => {
+    hours.forEach(h => {
+      const base = (d==='Sabtu'||d==='Minggu') ? 30 : 45;
+      const peak = (h==='07'||h==='17') ? 55 : 0;
+      dummyHeat[`${d}_${h}`] = Math.floor(Math.random()*35 + base + peak);
+    });
+  });
+  const heatValues = Object.keys(heatFromFlask).length > 0 ? heatFromFlask : dummyHeat;
 
-  const html = `
-    <div style="display:grid;grid-template-columns:70px repeat(${hours.length},${cellSize}px);gap:3px;font-size:11px;">
+  const cellSize = 48;
+  const maxV = 120;
+  let heatHtml = `
+    <div style="display:grid;grid-template-columns:72px repeat(${hours.length},${cellSize}px);
+                gap:3px;font-size:11px;padding:4px 0;">
       <div></div>
-      ${hours.map(h=>`<div style="text-align:center;color:var(--text-muted);padding:4px 0;">${h}:xx</div>`).join('')}
-      ${days.map((d, di) => `
-        <div style="color:var(--text-muted);display:flex;align-items:center;padding-right:8px;">${d}</div>
-        ${hours.map((h, hi) => {
-          const val = Math.floor(Math.random() * 100 + 10);
-          const ratio = val / maxVal;
-          const r = Math.round(14 + ratio * 225);
-          const g = Math.round(34 + ratio * (68 - 34));
-          const b = Math.round(48 * (1-ratio));
-          return `<div title="${d} ${h}:xx → ${val} kend." style="
-            height:${cellSize}px;background:rgb(${r},${g},${b});
-            border-radius:5px;display:flex;align-items:center;justify-content:center;
-            font-family:var(--font-mono);font-size:10px;
-            color:${ratio > 0.5 ? '#fff':'var(--text-muted)'};
-            cursor:default;transition:transform 0.1s;
-          " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform=''">${val}</div>`;
-        }).join('')}
+      ${hours.map(h=>`
+        <div style="text-align:center;color:var(--text-muted);padding:4px 0;">${h}:xx</div>
       `).join('')}
-    </div>
   `;
 
-  heatContainer.innerHTML = html;
+  days.forEach(day => {
+    heatHtml += `
+      <div style="color:var(--text-muted);display:flex;align-items:center;
+                  padding-right:8px;font-size:11.5px;">${day}</div>`;
+    hours.forEach(hour => {
+      const val   = heatValues[`${day}_${hour}`] ?? null;
+      const ratio = val != null ? Math.min(val / maxV, 1) : 0;
+      const r = Math.round(14  + ratio * 225);
+      const g = Math.round(34  + ratio * 34);
+      const b = Math.round(48  * (1 - ratio));
+      const bg    = val != null ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,0.03)';
+      const color = (ratio > 0.45 && val != null) ? '#fff' : 'var(--text-muted)';
+      heatHtml += `
+        <div title="${day} ${hour}:xx → ${val ?? '—'} kend."
+             style="height:${cellSize}px;background:${bg};border-radius:5px;
+                    display:flex;align-items:center;justify-content:center;
+                    font-family:var(--font-mono);font-size:10px;color:${color};
+                    cursor:default;transition:transform 0.1s;"
+             onmouseover="this.style.transform='scale(1.08)'"
+             onmouseout="this.style.transform=''">
+          ${val ?? '—'}
+        </div>`;
+    });
+  });
+  heatHtml += '</div>';
+  document.getElementById('heatmap').innerHTML = heatHtml;
 
   function applyFilter() {
     document.getElementById('loadingOverlay').classList.remove('hidden');
     document.getElementById('loadingText').textContent = 'Memuat data...';
-    setTimeout(() => location.reload(), 800);
+    setTimeout(() => location.reload(), 600);
   }
-
-  function resetFilter() { location.href = "{{ url_for('dashboard') }}"; }
 </script>
 {% endblock %}
