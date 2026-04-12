@@ -28,16 +28,53 @@
     <!-- Navigation -->
     <nav class="sidebar-nav">
 
+      {# ══════════════════════════════════════════
+         SIDEBAR NAVIGATION — logic per role:
+         · Publik (belum login)  : Beranda, Prediksi
+         · Staff  (role=staff)   : + Dashboard
+         · Analis (role=analis)  : + Klasifikasi, Validasi, Retrain
+         · Admin  (role=admin)   : + Manajemen User
+         ══════════════════════════════════════════ #}
+
+      {# --- MENU PUBLIK (semua orang bisa lihat) --- #}
       <div class="nav-section-label">Menu Utama</div>
 
       <a href="{{ url_for('index') }}"
          class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
         Beranda
       </a>
+
+      <a href="{{ url_for('prediksi') }}"
+         class="nav-item {% if request.endpoint == 'prediksi' %}active{% endif %}">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Prediksi Kepadatan
+      </a>
+
+      {# --- MENU DISHUB (butuh login, semua role) --- #}
+      {% if current_user.is_authenticated %}
+
+      <a href="{{ url_for('dashboard') }}"
+         class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        Dashboard &amp; Analitik
+      </a>
+
+      {# --- MENU ANALIS & ADMIN (akses_penuh = True) --- #}
+      {% if current_user.has_full_access %}
+      <div class="nav-section-label">Manajemen Data</div>
 
       <a href="{{ url_for('classifier') }}"
          class="nav-item {% if request.endpoint == 'classifier' %}active{% endif %}">
@@ -47,65 +84,70 @@
         Klasifikasi Data
       </a>
 
-      <a href="{{ url_for('dashboard') }}"
-         class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-          <line x1="6" y1="20" x2="6" y2="14"/>
-        </svg>
-        Dashboard & Analitik
-      </a>
-
-      <a href="{{ url_for('prediksi') }}"
-         class="nav-item {% if request.endpoint == 'prediksi' %}active{% endif %}">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-        </svg>
-        Prediksi Manual
-      </a>
-
-      <div class="nav-section-label">Manajemen Data</div>
-
       <a href="{{ url_for('validasi') }}"
          class="nav-item {% if request.endpoint == 'validasi' %}active{% endif %}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/>
+          <path d="M9 12l2 2 4-4"/>
+          <path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/>
         </svg>
         Validasi Data
-        {# <span class="nav-badge">3</span> #}
       </a>
 
       <a href="{{ url_for('retrain_model') }}"
          class="nav-item {% if request.endpoint == 'retrain_model' %}active{% endif %}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
         </svg>
         Retrain Model
       </a>
+      {% endif %}
+
+      {# --- MENU ADMIN ONLY --- #}
+      {% if current_user.role and current_user.role.nama == 'admin' %}
+      <div class="nav-section-label">Administrasi</div>
+
+      <a href="{{ url_for('users_list') }}"
+         class="nav-item {% if 'users' in request.endpoint %}active{% endif %}">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Manajemen User
+      </a>
+      {% endif %}
+
+      {% endif %}{# end if authenticated #}
 
     </nav>
 
     <!-- User Footer -->
     <div class="sidebar-footer">
+      {% if current_user.is_authenticated %}
       <div class="sidebar-user">
         <div class="user-avatar">
-            {#{{ current_user.username[0].upper() if current_user.is_authenticated else 'A' }}#}
-            A
+          {{ current_user.nama_lengkap[0].upper() if current_user.nama_lengkap else current_user.username[0].upper() }}
         </div>
         <div class="user-info">
-            {#<div class="name">{{ current_user.username if current_user.is_authenticated else 'Admin' }}</div>#}
-            <div class="name">Admin</div>
-          <div class="role">Staff Dishub</div>
+          <div class="name">{{ current_user.nama_lengkap or current_user.username }}</div>
+          <div class="role">{{ current_user.role.nama | capitalize if current_user.role else '—' }}</div>
         </div>
-        <a href="{{ url_for('logout') }}" class="logout-btn" title="Keluar">
+        <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Keluar">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
         </a>
       </div>
+      {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-primary w-full btn-sm">
+        🔐 Login Dishub
+      </a>
+      {% endif %}
     </div>
 
   </aside>
