@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Akses Ditolak{% endblock %}
+{% block page_title %}Akses Ditolak{% endblock %}
+{% block breadcrumb %}403{% endblock %}
+{% block content %}
+<div style="text-align:center;padding:80px 20px;">
+  <div style="font-size:64px;margin-bottom:20px;">🚫</div>
+  <h1 style="font-family:var(--font-display);font-size:32px;color:var(--danger);margin-bottom:12px;">
+    Akses Ditolak
+  </h1>
+  <p style="font-size:14px;color:var(--text-muted);margin-bottom:28px;max-width:400px;margin-inline:auto;line-height:1.7;">
+    Halaman ini hanya dapat diakses oleh pengguna dengan role <strong>Admin</strong> atau <strong>Analis</strong>.
+    Hubungi administrator jika Anda merasa ini adalah kesalahan.
+  </p>
+  <a href="{{ url_for('index') }}" class="btn btn-primary">← Kembali ke Beranda</a>
+</div>
+{% endblock %}

@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+
+{% block title %}Manajemen User{% endblock %}
+{% block page_title %}Manajemen User{% endblock %}
+{% block breadcrumb %}Manajemen User{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1>Manajemen User</h1>
+      <p>Kelola akun pengguna sistem SIKEDAT — hanya dapat diakses oleh Administrator.</p>
+    </div>
+    {% if mode != 'create' and mode != 'edit' %}
+    <a href="{{ url_for('users_create') }}" class="btn btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Tambah User Baru
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODE: LIST — Daftar semua user
+     ══════════════════════════════════════ -->
+{% if mode == 'list' %}
+
+<!-- Stat cards ringkasan -->
+<div class="grid grid-3 fade-in" style="margin-bottom: 20px;">
+  <div class="stat-card fade-in delay-1">
+    <span class="stat-icon">👥</span>
+    <div class="stat-label">Total User</div>
+    <div class="stat-value">{{ semua_user | length }}</div>
+    <div class="stat-meta">terdaftar di sistem</div>
+  </div>
+  <div class="stat-card success fade-in delay-2">
+    <span class="stat-icon">✅</span>
+    <div class="stat-label">User Aktif</div>
+    <div class="stat-value">{{ semua_user | selectattr('is_active') | list | length }}</div>
+    <div class="stat-meta">dapat login ke sistem</div>
+  </div>
+  <div class="stat-card danger fade-in delay-3">
+    <span class="stat-icon">🚫</span>
+    <div class="stat-label">Nonaktif</div>
+    <div class="stat-value">{{ semua_user | rejectattr('is_active') | list | length }}</div>
+    <div class="stat-meta">tidak dapat login</div>
+  </div>
+</div>
+
+<!-- Tabel daftar user -->
+<div class="card fade-in delay-2">
+  <div class="card-header">
+    <div class="card-title">
+      <span class="dot"></span>Daftar Pengguna Sistem
+    </div>
+    <!-- Filter role -->
+    <div class="tabs">
+      <button class="tab active" onclick="filterRole('semua', this)">Semua</button>
+      {% for role in semua_role %}
+      <button class="tab" onclick="filterRole('{{ role.nama }}', this)">
+        {{ role.nama | capitalize }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="userTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nama Lengkap</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Akses Penuh</th>
+          <th>Status</th>
+          <th>Dibuat</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in semua_user %}
+        <tr data-role="{{ u.role.nama if u.role else '' }}">
+          <td class="td-mono" style="color:var(--text-muted);">{{ u.id }}</td>
+          <td style="font-weight:600;">
+            <div class="flex items-center gap-2">
+              <div style="
+                width:30px;height:30px;border-radius:50%;flex-shrink:0;
+                background:linear-gradient(135deg,var(--primary-dark),var(--cyan));
+                display:flex;align-items:center;justify-content:center;
+                font-size:12px;font-weight:700;color:#fff;
+              ">
+                {{ u.nama_lengkap[0].upper() if u.nama_lengkap else u.username[0].upper() }}
+              </div>
+              {{ u.nama_lengkap or '—' }}
+            </div>
+          </td>
+          <td class="td-mono" style="color:var(--primary-light);">{{ u.username }}</td>
+          <td>
+            {% if u.role %}
+            {% set role_colors = {'admin': 'danger', 'analis': 'primary', 'staff': 'info'} %}
+            <span class="badge badge-{{ role_colors.get(u.role.nama, 'info') }}">
+              {{ u.role.nama | capitalize }}
+            </span>
+            {% else %}
+            <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.has_full_access %}
+            <span style="color:var(--success);">✅ Ya</span>
+            {% else %}
+            <span style="color:var(--text-muted);">— Tidak</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge badge-success"><span class="dot"></span>Aktif</span>
+            {% else %}
+            <span class="badge badge-danger"><span class="dot"></span>Nonaktif</span>
+            {% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--text-muted);">
+            {{ u.created_at.strftime('%d %b %Y') if u.created_at else '—' }}
+          </td>
+          <td>
+            <div class="flex items-center gap-1">
+              <!-- Edit -->
+              <a href="{{ url_for('users_edit', user_id=u.id) }}"
+                 class="btn btn-ghost btn-icon-sm" title="Edit User">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </a>
+              <!-- Aktifkan / Nonaktifkan -->
+              {% if u.id != current_user.id %}
+              <form method="POST"
+                    action="{{ url_for('users_toggle', user_id=u.id) }}"
+                    style="display:inline;"
+                    onsubmit="return confirm('{{ 'Nonaktifkan' if u.is_active else 'Aktifkan' }} user {{ u.username }}?')">
+                <button type="submit"
+                        class="btn btn-ghost btn-icon-sm"
+                        title="{{ 'Nonaktifkan' if u.is_active else 'Aktifkan' }}"
+                        style="color:{{ 'var(--danger)' if u.is_active else 'var(--success)' }};">
+                  {% if u.is_active %}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                  </svg>
+                  {% else %}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  {% endif %}
+                </button>
+              </form>
+              {% else %}
+              <!-- User sendiri tidak bisa toggle dirinya -->
+              <span style="font-size:11px;color:var(--text-muted);padding:0 6px;">—</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+            <div style="font-size:32px;margin-bottom:8px;opacity:0.2;">👥</div>
+            Belum ada user terdaftar.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODE: CREATE — Form tambah user baru
+     ══════════════════════════════════════ -->
+{% elif mode == 'create' %}
+
+<div class="grid grid-12 fade-in">
+  <div class="card col-span-6 fade-in delay-1">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="dot" style="background:var(--success);"></span>
+        Tambah User Baru
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('users_create') }}" id="createForm">
+
+      <div class="form-group">
+        <label class="form-label">Nama Lengkap</label>
+        <input type="text" class="form-control" name="nama_lengkap"
+               placeholder="cth: Budi Santoso, S.T." />
+        <div class="form-hint">Opsional — ditampilkan di sidebar</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Username <span style="color:var(--danger);">*</span></label>
+        <div class="input-group">
+          <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <input type="text" class="form-control" name="username"
+                 placeholder="cth: budi_dishub" required />
+        </div>
+        <div class="form-hint">Harus unik, tanpa spasi</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password <span style="color:var(--danger);">*</span></label>
+        <div class="input-group">
+          <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <input type="password" class="form-control" name="password"
+                 id="createPassword" placeholder="Minimal 6 karakter" required />
+          <button type="button" onclick="togglePwd('createPassword')"
+                  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;color:var(--text-muted);cursor:pointer;">
+            👁
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Role <span style="color:var(--danger);">*</span></label>
+        <select class="form-control" name="role_id" required onchange="updateRoleInfo(this)">
+          <option value="">— Pilih Role —</option>
+          {% for role in semua_role %}
+          <option value="{{ role.id }}">{{ role.nama | capitalize }}</option>
+          {% endfor %}
+        </select>
+        <div id="roleInfo" class="form-hint" style="margin-top:6px;"></div>
+      </div>
+
+      <!-- Preview akses -->
+      <div id="aksesPreview" style="
+        display:none;padding:12px 16px;background:var(--bg-elevated);
+        border-radius:var(--radius-md);margin-bottom:20px;font-size:12.5px;
+      ">
+        <div style="font-weight:700;color:var(--text-heading);margin-bottom:6px;">
+          Akses halaman yang bisa dibuka:
+        </div>
+        <div id="aksesDetail"></div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Buat User
+        </button>
+        <a href="{{ url_for('users_list') }}" class="btn btn-outline">← Batal</a>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Panduan role -->
+  <div class="card col-span-6 fade-in delay-2">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="dot" style="background:var(--warning);"></span>
+        Panduan Role
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      {% set role_guide = [
+        ('admin',  'danger',  'Akses penuh ke semua halaman termasuk Manajemen User. Dapat membuat, mengedit, dan menonaktifkan user lain.'),
+        ('analis', 'primary', 'Akses ke Beranda, Dashboard, Prediksi, Klasifikasi Data, Validasi Data, dan Retrain Model.'),
+        ('staff',  'info',    'Akses terbatas ke Beranda, Dashboard, dan Prediksi saja. Tidak dapat mengelola data.'),
+      ] %}
+      {% for nama, color, desc in role_guide %}
+      <div style="
+        padding:14px 16px;background:var(--bg-elevated);
+        border-radius:var(--radius-md);border-left:3px solid var(--{{ color }});
+      ">
+        <div class="flex items-center gap-2" style="margin-bottom:6px;">
+          <span class="badge badge-{{ color }}">{{ nama | capitalize }}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-secondary);">{{ desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODE: EDIT — Form edit user
+     ══════════════════════════════════════ -->
+{% elif mode == 'edit' %}
+
+<div class="grid grid-12 fade-in">
+  <div class="card col-span-6 fade-in delay-1">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="dot" style="background:var(--warning);"></span>
+        Edit User — <span class="td-mono" style="color:var(--primary-light);">{{ user.username }}</span>
+      </div>
+      <span class="badge badge-{{ 'success' if user.is_active else 'danger' }}">
+        {{ 'Aktif' if user.is_active else 'Nonaktif' }}
+      </span>
+    </div>
+
+    <form method="POST" action="{{ url_for('users_edit', user_id=user.id) }}" id="editForm">
+
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-control"
+               value="{{ user.username }}" disabled
+               style="opacity:0.5;cursor:not-allowed;" />
+        <div class="form-hint">Username tidak dapat diubah</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nama Lengkap</label>
+        <input type="text" class="form-control" name="nama_lengkap"
+               value="{{ user.nama_lengkap or '' }}"
+               placeholder="Nama lengkap" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password Baru</label>
+        <div class="input-group">
+          <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <input type="password" class="form-control" name="password"
+                 id="editPassword" placeholder="Kosongkan jika tidak ingin diubah" />
+          <button type="button" onclick="togglePwd('editPassword')"
+                  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;color:var(--text-muted);cursor:pointer;">
+            👁
+          </button>
+        </div>
+        <div class="form-hint">Biarkan kosong jika password tidak diubah</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-control" name="role_id"
+                {% if user.id == current_user.id %}disabled{% endif %}>
+          {% for role in semua_role %}
+          <option value="{{ role.id }}"
+                  {{ 'selected' if user.role_id == role.id else '' }}>
+            {{ role.nama | capitalize }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if user.id == current_user.id %}
+        <div class="form-hint" style="color:var(--warning);">
+          ⚠️ Tidak dapat mengubah role akun sendiri
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="flex items-center gap-3" style="cursor:pointer;">
+          <input type="checkbox" name="is_active"
+                 {% if user.is_active %}checked{% endif %}
+                 {% if user.id == current_user.id %}disabled{% endif %}
+                 style="accent-color:var(--primary);width:16px;height:16px;" />
+          <div>
+            <div style="font-size:13.5px;font-weight:600;color:var(--text-heading);">
+              User Aktif
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);">
+              User yang nonaktif tidak dapat login ke sistem
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Simpan Perubahan
+        </button>
+        <a href="{{ url_for('users_list') }}" class="btn btn-outline">← Batal</a>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Info user -->
+  <div class="card col-span-6 fade-in delay-2">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="dot" style="background:var(--cyan);"></span>
+        Info User
+      </div>
+    </div>
+    <div class="kv-pair">
+      <span class="key">ID User</span>
+      <span class="val text-mono">{{ user.id }}</span>
+    </div>
+    <div class="kv-pair">
+      <span class="key">Username</span>
+      <span class="val text-mono" style="color:var(--primary-light);">{{ user.username }}</span>
+    </div>
+    <div class="kv-pair">
+      <span class="key">Role saat ini</span>
+      <span class="val">
+        {% if user.role %}
+        {% set rc = {'admin':'danger','analis':'primary','staff':'info'} %}
+        <span class="badge badge-{{ rc.get(user.role.nama,'info') }}">
+          {{ user.role.nama | capitalize }}
+        </span>
+        {% else %}—{% endif %}
+      </span>
+    </div>
+    <div class="kv-pair">
+      <span class="key">Akses penuh</span>
+      <span class="val">
+        {{ '✅ Ya' if user.has_full_access else '— Tidak' }}
+      </span>
+    </div>
+    <div class="kv-pair">
+      <span class="key">Status</span>
+      <span class="val">
+        {% if user.is_active %}
+        <span style="color:var(--success);">● Aktif</span>
+        {% else %}
+        <span style="color:var(--danger);">● Nonaktif</span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="kv-pair" style="border:none;">
+      <span class="key">Tanggal dibuat</span>
+      <span class="val">
+        {{ user.created_at.strftime('%d %B %Y, %H:%M') if user.created_at else '—' }}
+      </span>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  /* ── Filter tabel per role ── */
+  function filterRole(role, btn) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#userTable tbody tr[data-role]').forEach(row => {
+      row.style.display = (role === 'semua' || row.dataset.role === role) ? '' : 'none';
+    });
+  }
+
+  /* ── Toggle visibility password ── */
+  function togglePwd(id) {
+    const el = document.getElementById(id);
+    el.type = el.type === 'password' ? 'text' : 'password';
+  }
+
+  /* ── Preview akses berdasarkan role yang dipilih ── */
+  const roleData = {
+    {% for role in semua_role | default([]) %}
+    '{{ role.id }}': {
+      nama: '{{ role.nama }}',
+      akses_penuh: {{ 'true' if role.akses_penuh else 'false' }},
+      deskripsi: '{{ role.deskripsi }}'
+    },
+    {% endfor %}
+  };
+
+  function updateRoleInfo(sel) {
+    const r = roleData[sel.value];
+    const info    = document.getElementById('roleInfo');
+    const preview = document.getElementById('aksesPreview');
+    const detail  = document.getElementById('aksesDetail');
+
+    if (!r) { info.textContent = ''; preview.style.display = 'none'; return; }
+
+    info.textContent = r.deskripsi;
+    preview.style.display = '';
+
+    const aksesList = ['✅ Beranda', '✅ Prediksi Kepadatan'];
+    if (r.nama === 'staff' || r.nama === 'analis' || r.nama === 'admin') {
+      aksesList.push('✅ Dashboard &amp; Analitik');
+    }
+    if (r.akses_penuh) {
+      aksesList.push('✅ Klasifikasi Data', '✅ Validasi Data', '✅ Retrain Model');
+    } else {
+      aksesList.push('❌ Klasifikasi Data', '❌ Validasi Data', '❌ Retrain Model');
+    }
+    if (r.nama === 'admin') {
+      aksesList.push('✅ Manajemen User');
+    } else {
+      aksesList.push('❌ Manajemen User');
+    }
+
+    detail.innerHTML = aksesList.map(a =>
+      `<div style="margin-bottom:3px;font-size:12px;color:var(--text-secondary);">${a}</div>`
+    ).join('');
+  }
+</script>
+{% endblock %}

@@ -90,7 +90,7 @@
       {% endwith %}
 
       <!-- Form -->
-      <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+      <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
         {#{{ form.hidden_tag() if form.hidden_tag is defined }}#}
 
         <div class="form-group">
