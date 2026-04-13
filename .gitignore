@@ -1,0 +1,40 @@
+# =========================
+# Python & Byte-compiled
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# Database Lokal
+# =========================
+*.db
+*.sqlite3
+sikedat.db
+
+# =========================
+# Virtual Environments (Jika pakai venv Python)
+# =========================
+venv/
+env/
+.venv/
+
+# =========================
+# Node.js & NPM (Jika ada frontend / script npm)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# =========================
+# Environment Variables & Keamanan
+# =========================
+.env
+.env.local
+
+# =========================
+# OS & Editor Files (Windows / VS Code)
+# =========================
+.vscode/
+.idea/
+Thumbs.db
