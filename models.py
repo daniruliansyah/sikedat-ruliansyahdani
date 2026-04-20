@@ -109,7 +109,7 @@ class Dataset(db.Model):
     # pending   = belum divalidasi pakar
     # validated = pakar setuju dengan prediksi model
     # corrected = pakar mengkoreksi label
-    status_validasi   = db.Column(db.String(15),  default='pending', nullable=False)
+    status_validasi   = db.Column(db.String(15),  default='pending', nullable=True)
 
     # Label akhir setelah validasi pakar (bisa beda dari prediksi model)
     label_final       = db.Column(db.String(10),  nullable=True)
@@ -117,7 +117,13 @@ class Dataset(db.Model):
     # Nama file CSV asal data ini diupload
     nama_file         = db.Column(db.String(200), nullable=True)
 
-    # ── KOLOM TAMBAHAN (sesuai permintaan) ──
+    # Tanggal rekaman video (untuk memudahkan validator mengecek video mana)
+    # Format: YYYY-MM-DD, diinput manual saat upload CSV
+    tanggal           = db.Column(db.Date, nullable=True)
+
+    # Batch ID — penanda satu sesi upload/klasifikasi
+    # Sistem antrian: batch lama harus selesai divalidasi sebelum batch baru muncul
+    batch_id          = db.Column(db.String(40), nullable=True, index=True)
 
     # Siapa yang menjalankan klasifikasi (upload CSV di halaman classifier)
     classified_by     = db.Column(
