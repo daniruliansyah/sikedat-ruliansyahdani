@@ -1,0 +1,47 @@
+{
+  "best_algo": "Random Forest",
+  "rf": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "cv_score": 1.0,
+    "params": {
+      "max_depth": "10",
+      "min_samples_leaf": "1",
+      "min_samples_split": "5",
+      "n_estimators": "100"
+    }
+  },
+  "svm": {
+    "accuracy": 0.955556,
+    "precision": 0.955936,
+    "recall": 0.955556,
+    "f1_score": 0.955535,
+    "cv_score": 0.949364,
+    "params": {
+      "C": "10",
+      "gamma": "auto",
+      "kernel": "rbf"
+    }
+  },
+  "n_train": 537,
+  "n_test": 135,
+  "total_data": 672,
+  "label_classes": [
+    "Rendah",
+    "Sedang",
+    "Tinggi"
+  ],
+  "fitur": [
+    "hari_enc",
+    "jam",
+    "menit",
+    "motor",
+    "mobil",
+    "bus",
+    "truk",
+    "total_kendaraan"
+  ],
+  "tanggal": "2026-04-15 16:13:00"
+}
