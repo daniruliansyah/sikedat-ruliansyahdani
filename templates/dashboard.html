@@ -16,59 +16,72 @@
 </div>
 
 <!-- ── FILTER BAR ── -->
+<form method="GET" action="{{ url_for('dashboard') }}">
 <div class="card fade-in" style="margin-bottom: 20px; padding: 14px 20px;">
   <div class="flex items-center gap-3 flex-wrap">
     <div style="min-width:150px;">
       <label class="form-label" style="margin-bottom:4px;">Hari</label>
-      <select class="form-control" id="filterDay">
+      <select class="form-control" name="filter_day">
         <option value="">Semua Hari</option>
         {% for h in ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] %}
-        <option>{{ h }}</option>
+        <option value="{{ h }}" {{ 'selected' if filter_day == h else '' }}>{{ h }}</option>
         {% endfor %}
       </select>
     </div>
     <div style="min-width:150px;">
       <label class="form-label" style="margin-bottom:4px;">Kategori</label>
-      <select class="form-control" id="filterKategori">
+      <select class="form-control" name="filter_kategori">
         <option value="">Semua Kategori</option>
-        <option value="rendah">Rendah</option>
-        <option value="sedang">Sedang</option>
-        <option value="tinggi">Tinggi</option>
+        {% for k in ['rendah','sedang','tinggi'] %}
+        <option value="{{ k }}" {{ 'selected' if filter_kategori == k else '' }}>
+          {{ k | capitalize }}
+        </option>
+        {% endfor %}
       </select>
     </div>
-    <div style="padding-top:22px;">
-      <button class="btn btn-primary" onclick="applyFilter()">Terapkan</button>
-      <button class="btn btn-ghost"
-              onclick="location.href='{{ url_for('dashboard') }}'">Reset</button>
+    <div style="padding-top:22px;display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary">Terapkan</button>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Reset</a>
     </div>
+    {% if filter_day or filter_kategori %}
+    <div style="padding-top:22px;">
+      <span class="badge badge-primary">
+        Filter aktif:
+        {% if filter_day %}{{ filter_day }}{% endif %}
+        {% if filter_day and filter_kategori %} · {% endif %}
+        {% if filter_kategori %}{{ filter_kategori | capitalize }}{% endif %}
+      </span>
+    </div>
+    {% endif %}
   </div>
 </div>
+</form>
 
 <!-- ── STAT CARDS ── -->
 <div class="grid grid-4 fade-in" style="margin-bottom: 20px;">
   <div class="stat-card fade-in delay-1">
     <span class="stat-icon">📦</span>
     <div class="stat-label">Total Observasi</div>
-    <div class="stat-value">{{ total_obs | default('1,008') }}</div>
+    <div class="stat-value">{{ total_data }}</div>
     <div class="stat-meta">21 hari × 48 interval</div>
   </div>
   <div class="stat-card success fade-in delay-2">
     <span class="stat-icon">🟢</span>
     <div class="stat-label">Rendah</div>
-    <div class="stat-value">{{ count_rendah | default('302') }}</div>
-    <div class="stat-meta">{{ pct_rendah | default('30') }}% dari total</div>
+    <div class="stat-value">{{ count_rendah }}</div>
+    <div class="stat-meta">{{ pct_rendah }}% dari total</div>
   </div>
   <div class="stat-card warning fade-in delay-3">
     <span class="stat-icon">🟡</span>
     <div class="stat-label">Sedang</div>
-    <div class="stat-value">{{ count_sedang | default('412') }}</div>
-    <div class="stat-meta">{{ pct_sedang | default('41') }}% dari total</div>
+    <div class="stat-value">{{ count_sedang }}</div>
+    <div class="stat-meta">{{ pct_sedang }}% dari total</div>
   </div>
   <div class="stat-card danger fade-in delay-4">
     <span class="stat-icon">🔴</span>
     <div class="stat-label">Tinggi</div>
-    <div class="stat-value">{{ count_tinggi | default('294') }}</div>
-    <div class="stat-meta">{{ pct_tinggi | default('29') }}% dari total</div>
+    <div class="stat-value">{{ count_tinggi }}</div>
+    <div class="stat-meta">{{ pct_tinggi }}% dari total</div>
   </div>
 </div>
 
@@ -105,9 +118,9 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       {% for label, val, pct, color in [
-        ('Rendah', count_rendah|default(302), pct_rendah|default(30), '#10C981'),
-        ('Sedang', count_sedang|default(412), pct_sedang|default(41), '#F59E0B'),
-        ('Tinggi', count_tinggi|default(294), pct_tinggi|default(29), '#EF4444'),
+        ('Rendah', count_rendah|default(302), pct_rendah, '#10C981'),
+        ('Sedang', count_sedang|default(412), pct_sedang, '#F59E0B'),
+        ('Tinggi', count_tinggi|default(294), pct_tinggi, '#EF4444'),
       ] %}
       <div class="flex items-center justify-between" style="font-size:12.5px;">
         <div class="flex items-center gap-2">
@@ -173,7 +186,7 @@
                     transform:translate(-50%,-55%);text-align:center;">
           <div style="font-family:var(--font-mono);font-size:26px;
                       font-weight:500;color:var(--text-heading);">
-            {{ heavy_pct | default(11) }}%
+            {{ heavy_pct }}%
           </div>
           <div style="font-size:11px;color:var(--text-muted);">Kendaraan Berat</div>
         </div>
@@ -181,15 +194,15 @@
     </div>
     <div class="kv-pair">
       <span class="key">🚌 Rata-rata Bus / interval</span>
-      <span class="val" style="color:var(--success);">{{ avg_bus | default('4.5') }}</span>
+      <span class="val" style="color:var(--success);">{{ avg_bus }}</span>
     </div>
     <div class="kv-pair">
       <span class="key">🚛 Rata-rata Truk / interval</span>
-      <span class="val" style="color:var(--warning);">{{ avg_truk | default('2.7') }}</span>
+      <span class="val" style="color:var(--warning);">{{ avg_truk }}</span>
     </div>
     <div class="kv-pair" style="border:none;">
       <span class="key">Total kendaraan berat</span>
-      <span class="val">{{ total_heavy | default('7,340') }}</span>
+      <span class="val">{{ total_heavy }}</span>
     </div>
   </div>
 
@@ -216,18 +229,7 @@
           </tr>
         </thead>
         <tbody>
-          {% set top_data = top_volume | default([
-            {'hari':'Jumat',   'jam':7,  'menit':20, 'motor':85,'mobil':24,'bus':6,'truk':4, 'total':119,'kategori':'tinggi'},
-            {'hari':'Senin',   'jam':7,  'menit':10, 'motor':82,'mobil':22,'bus':7,'truk':3, 'total':114,'kategori':'tinggi'},
-            {'hari':'Rabu',    'jam':7,  'menit':30, 'motor':79,'mobil':21,'bus':6,'truk':5, 'total':111,'kategori':'tinggi'},
-            {'hari':'Selasa',  'jam':17, 'menit':20, 'motor':78,'mobil':20,'bus':7,'truk':4, 'total':109,'kategori':'tinggi'},
-            {'hari':'Kamis',   'jam':7,  'menit':20, 'motor':76,'mobil':21,'bus':5,'truk':4, 'total':106,'kategori':'tinggi'},
-            {'hari':'Jumat',   'jam':17, 'menit':10, 'motor':75,'mobil':20,'bus':6,'truk':3, 'total':104,'kategori':'tinggi'},
-            {'hari':'Senin',   'jam':17, 'menit':30, 'motor':73,'mobil':19,'bus':6,'truk':4, 'total':102,'kategori':'tinggi'},
-            {'hari':'Rabu',    'jam':17, 'menit':40, 'motor':70,'mobil':18,'bus':5,'truk':4, 'total':97, 'kategori':'sedang'},
-            {'hari':'Sabtu',   'jam':8,  'menit':10, 'motor':68,'mobil':17,'bus':5,'truk':3, 'total':93, 'kategori':'sedang'},
-            {'hari':'Minggu',  'jam':17, 'menit':10, 'motor':64,'mobil':16,'bus':4,'truk':3, 'total':87, 'kategori':'sedang'},
-          ]) %}
+          {% set top_data = top_volume | default([]) %}
           {% for row in top_data %}
           <tr>
             <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
@@ -284,8 +286,8 @@
   const JAM_DISPLAY = ['06:xx','07:xx','08:xx','15:xx','16:xx','17:xx','18:xx','19:xx'];
 
   /* ── Dummy data (diganti Flask saat data nyata tersedia) ── */
-  const avgData = {{ avg_per_jam | default([38,92,68,42,65,88,55,22]) | tojson }};
-  const maxData = {{ max_per_jam | default([52,119,95,60,88,110,72,38]) | tojson }};
+  const avgData = {{ avg_per_jam | tojson }};
+  const maxData = {{ max_per_jam | tojson }};
 
   /* ── Chart Per Jam ── */
   const perJamChart = new Chart(
@@ -336,7 +338,7 @@
     data: {
       labels: ['Rendah','Sedang','Tinggi'],
       datasets: [{
-        data: [{{ pct_rendah|default(30) }},{{ pct_sedang|default(41) }},{{ pct_tinggi|default(29) }}],
+        data: [{{ pct_rendah }},{{ pct_sedang }},{{ pct_tinggi }}],
         backgroundColor: ['#10C981','#F59E0B','#EF4444'],
         borderWidth: 0, hoverOffset: 6
       }]
@@ -355,14 +357,14 @@
       datasets: [
         {
           label: 'Weekday (Sen–Jum)',
-          data: {{ weekday_avg | default([38,92,68,42,65,88,55,22]) | tojson }},
+          data: {{ weekday_avg | tojson }},
           borderColor: '#1A6FFF',
           backgroundColor: 'rgba(26,111,255,0.08)',
           borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 3
         },
         {
           label: 'Weekend (Sab–Min)',
-          data: {{ weekend_avg | default([25,48,55,38,58,72,40,16]) | tojson }},
+          data: {{ weekend_avg | tojson }},
           borderColor: '#F59E0B',
           backgroundColor: 'rgba(245,158,11,0.07)',
           borderWidth: 2.5, tension: 0.4, fill: true, pointRadius: 3
@@ -385,10 +387,10 @@
     data: {
       labels: JAM_DISPLAY,
       datasets: [
-        { label:'Motor', data:{{ motor_per_jam|default([22,62,46,28,44,58,36,14])|tojson }}, backgroundColor:'#1A6FFF' },
-        { label:'Mobil', data:{{ mobil_per_jam|default([10,20,16,10,14,20,13,6])|tojson }},  backgroundColor:'#00C4FF' },
-        { label:'Bus',   data:{{ bus_per_jam|default([3,6,4,2,4,6,4,1])|tojson }},           backgroundColor:'#10C981' },
-        { label:'Truk',  data:{{ truk_per_jam|default([3,4,2,2,3,4,2,1])|tojson }},          backgroundColor:'#F59E0B' },
+        { label:'Motor', data:{{ motor_per_jam | tojson }}, backgroundColor:'#1A6FFF' },
+        { label:'Mobil', data:{{ mobil_per_jam | tojson }},  backgroundColor:'#00C4FF' },
+        { label:'Bus',   data:{{ bus_per_jam   | tojson }},           backgroundColor:'#10C981' },
+        { label:'Truk',  data:{{ truk_per_jam  | tojson }},          backgroundColor:'#F59E0B' },
       ]
     },
     options: {
@@ -406,7 +408,7 @@
     type: 'doughnut',
     data: {
       datasets: [{
-        data: [{{ heavy_pct|default(11) }}, {{ 100 - heavy_pct|default(11) }}],
+        data: [{{ heavy_pct }}, {{ 100 - heavy_pct }}],
         backgroundColor: ['#EF4444','rgba(255,255,255,0.05)'],
         borderWidth: 0
       }]
@@ -420,18 +422,9 @@
   /* ── Heatmap ── */
   const days  = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
   const hours = ['06','07','08','15','16','17','18','19'];
-  const heatFromFlask = {{ heatmap_data | default({}) | tojson }};
+  const heatFromFlask = {{ heatmap_data | tojson }};
 
-  /* Dummy jika tidak ada data dari Flask */
-  const dummyHeat = {};
-  days.forEach(d => {
-    hours.forEach(h => {
-      const base = (d==='Sabtu'||d==='Minggu') ? 30 : 45;
-      const peak = (h==='07'||h==='17') ? 55 : 0;
-      dummyHeat[`${d}_${h}`] = Math.floor(Math.random()*35 + base + peak);
-    });
-  });
-  const heatValues = Object.keys(heatFromFlask).length > 0 ? heatFromFlask : dummyHeat;
+  const heatValues = heatFromFlask || {};
 
   const cellSize = 48;
   const maxV = 120;
@@ -471,10 +464,6 @@
   heatHtml += '</div>';
   document.getElementById('heatmap').innerHTML = heatHtml;
 
-  function applyFilter() {
-    document.getElementById('loadingOverlay').classList.remove('hidden');
-    document.getElementById('loadingText').textContent = 'Memuat data...';
-    setTimeout(() => location.reload(), 600);
-  }
+  // Filter sekarang menggunakan form GET - tidak perlu JS applyFilter()
 </script>
 {% endblock %}

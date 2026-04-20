@@ -247,54 +247,20 @@
             </tr>
             {% endfor %}
           {% else %}
-          <!-- Placeholder rows -->
-          {% set hari_list  = ['Senin','Senin','Selasa','Selasa','Rabu','Rabu','Kamis','Kamis'] %}
-          {% set pred_list  = ['rendah','sedang','sedang','tinggi','rendah','tinggi','sedang','sedang'] %}
-          {% set stat_list  = ['pending','pending','pending','pending','validated','corrected','pending','pending'] %}
-          {% for i in range(8) %}
-          <tr data-kategori="{{ pred_list[i] }}"
-              data-status="{{ stat_list[i] }}"
-              data-hari="{{ hari_list[i] | lower }}" class="table-row">
-            <td>
-              <input type="checkbox" class="row-check" data-id="{{ i+1 }}"
-                     style="accent-color:var(--primary);cursor:pointer;"
-                     onchange="onCheckChange()">
-            </td>
-            <td class="td-mono" style="color:var(--text-muted);">{{ i+1 }}</td>
-            <td>{{ hari_list[i] }}</td>
-            <td class="td-mono">0{{ 6+(i//2) }}:00</td>
-            <td class="td-mono">{{ 10+(i%6)*10 }}</td>
-            <td class="td-mono" style="color:var(--primary-light);">{{ 25+i*5 }}</td>
-            <td class="td-mono" style="color:var(--cyan);">{{ 8+i*2 }}</td>
-            <td class="td-mono" style="color:var(--success);">{{ 2+i }}</td>
-            <td class="td-mono" style="color:var(--warning);">{{ 1+i }}</td>
-            <td class="td-mono" style="font-weight:600;">{{ 36+i*10 }}</td>
-            <td>
-              <span class="badge badge-{{ pred_list[i] }}">
-                <span class="dot"></span>{{ pred_list[i]|capitalize }}
-              </span>
-            </td>
-            <td>
-              <select class="form-control label-select"
-                      data-id="{{ i+1 }}"
-                      data-original="{{ pred_list[i] }}"
-                      style="width:108px;font-size:12px;padding:5px 8px;"
-                      onchange="onLabelChange(this)">
-                <option value="rendah" {{ 'selected' if pred_list[i]=='rendah' }}>🟢 Rendah</option>
-                <option value="sedang" {{ 'selected' if pred_list[i]=='sedang' }}>🟡 Sedang</option>
-                <option value="tinggi" {{ 'selected' if pred_list[i]=='tinggi' }}>🔴 Tinggi</option>
-              </select>
-            </td>
-            <td>
-              {% set sc = {'pending':'info','validated':'success','corrected':'warning'} %}
-              {% set sl = {'pending':'⏳ Pending','validated':'✅ Valid','corrected':'✏️ Dikoreksi'} %}
-              <span class="badge badge-{{ sc[stat_list[i]] }}"
-                    id="statusBadge-{{ i+1 }}">
-                {{ sl[stat_list[i]] }}
-              </span>
+          <!-- Empty state: tidak ada data untuk divalidasi -->
+          <tr>
+            <td colspan="14" style="text-align:center;padding:56px 20px;">
+              <div style="font-size:48px;margin-bottom:14px;opacity:0.2;">&#10003;</div>
+              <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">
+                Tidak Ada Data untuk Divalidasi
+              </div>
+              <div style="font-size:13px;color:var(--text-muted);line-height:1.7;">
+                Semua data sudah divalidasi, atau belum ada data yang diklasifikasi.<br>
+                Upload dan klasifikasi file CSV terlebih dahulu melalui halaman
+                <a href="{{ url_for('classifier') }}" style="color:var(--primary-light);">Klasifikasi Data</a>.
+              </div>
             </td>
           </tr>
-          {% endfor %}
           {% endif %}
         </tbody>
       </table>
@@ -653,7 +619,7 @@ function discardChanges() {
    PAGINATION
    ================================================ */
 var currentPage  = 1;
-var PAGE_SIZE    = 100;
+var PAGE_SIZE    = 50;
 
 function getPageableRows() {
   /* Ambil hanya row dari DB (bukan placeholder), yang tidak hidden oleh filter */
