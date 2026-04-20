@@ -72,8 +72,17 @@
       </div>
     </div>
 
+    <!-- Input tanggal rekaman -->
+    <div class="form-group" style="margin-top: 20px; max-width: 280px;">
+      <label class="form-label">Tanggal Rekaman Video</label>
+      <input type="date" class="form-control" name="tanggal_rekaman" id="tanggalRekaman" />
+      <div class="form-hint">
+        Opsional — membantu validator mengidentifikasi rekaman video mana yang diperiksa
+      </div>
+    </div>
+
     <!-- Submit (tanpa pilihan model) -->
-    <div style="margin-top: 20px;">
+    <div style="margin-top: 16px;">
       <button type="submit" class="btn btn-primary btn-lg" id="btnUpload" disabled>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2">
@@ -99,22 +108,36 @@
       </div>
       <div class="card-subtitle">
         {{ preview_rows | default(48) }} baris terdeteksi · Menampilkan 5 baris pertama
+        {% if tanggal_rekaman %} · Tanggal: <strong>{{ tanggal_rekaman }}</strong>{% endif %}
       </div>
     </div>
     <span class="badge badge-success">File Valid ✓</span>
   </div>
 
-  <div class="table-wrapper" style="margin-bottom:16px;">
-    <table>
-      <thead>
+  <!-- Toolbar -->
+  <div class="flex items-center justify-between" style="margin-bottom:10px;">
+    <span style="font-size:12px;color:var(--text-muted);" id="previewInfo">
+      Menampilkan 1–100 dari {{ preview_rows }} baris
+    </span>
+    <label style="font-size:12.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+      <input type="checkbox" id="previewShowAll" onchange="previewToggleAll(this)"
+             style="accent-color:var(--primary);" />
+      Tampilkan semua
+    </label>
+  </div>
+
+  <div class="table-wrapper" style="margin-bottom:12px;max-height:420px;overflow-y:auto;">
+    <table id="previewTable">
+      <thead style="position:sticky;top:0;z-index:1;background:var(--bg-elevated);">
         <tr>
-          <th>Hari</th><th>Jam</th><th>Menit</th>
+          <th>#</th><th>Hari</th><th>Jam</th><th>Menit</th>
           <th>Motor</th><th>Mobil</th><th>Bus</th><th>Truk</th><th>Total</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="previewTbody">
         {% for row in preview_data %}
-        <tr>
+        <tr data-idx="{{ loop.index }}">
+          <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
           <td>{{ row.hari }}</td>
           <td class="td-mono">{{ row.jam }}:00</td>
           <td class="td-mono">{{ row.menit }}</td>
@@ -129,9 +152,16 @@
     </table>
   </div>
 
+  <!-- Pagination preview -->
+  <div class="flex items-center justify-between" id="previewPaginWrap" style="margin-bottom:16px;">
+    <span style="font-size:12px;color:var(--text-muted);" id="previewPageInfo">Halaman 1</span>
+    <div class="pagination" id="previewPaginBtns"></div>
+  </div>
+
   <form method="POST" action="{{ url_for('run_classification') }}">
-    {{ form.hidden_tag() if form.hidden_tag is defined }}
+    {#{{ form.hidden_tag() if form.hidden_tag is defined }}#}
     <input type="hidden" name="file_path" value="{{ file_path | default('') }}" />
+    <input type="hidden" name="tanggal_rekaman" value="{{ tanggal_rekaman | default('') }}" />
     <div class="flex items-center gap-3">
       <button type="submit" class="btn btn-primary" id="btnClassify">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -163,9 +193,14 @@
       <a href="{{ url_for('download_result') }}" class="btn btn-outline btn-sm">
         ⬇️ Download CSV
       </a>
-      <a href="{{ url_for('validasi') }}" class="btn btn-primary btn-sm">
-        Validasi Hasil →
-      </a>
+      <!-- Tombol ini menyimpan hasil ke DB lalu redirect ke halaman validasi -->
+      <form method="POST" action="{{ url_for('import_classification_to_validasi') }}" style="display:inline;">
+        <button type="submit" class="btn btn-primary btn-sm"
+                onclick="document.getElementById('loadingOverlay').classList.remove('hidden');
+                         document.getElementById('loadingText').textContent='Menyimpan ke database...';">
+          ✅ Kirim ke Validasi →
+        </button>
+      </form>
     </div>
   </div>
 
@@ -182,19 +217,40 @@
     </div>
   </div>
 
+  <!-- Toolbar tabel: filter + pagination toggle -->
+  <div class="flex items-center gap-3" style="margin-bottom:14px;flex-wrap:wrap;">
+    <select id="filterKelas" class="form-control" style="width:160px;font-size:12px;"
+            onchange="filterHasil()">
+      <option value="">Semua Kategori</option>
+      <option value="rendah">🟢 Rendah</option>
+      <option value="sedang">🟡 Sedang</option>
+      <option value="tinggi">🔴 Tinggi</option>
+    </select>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+      <label style="font-size:12.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showAll" onchange="toggleShowAll(this)"
+               style="accent-color:var(--primary);" />
+        Tampilkan semua data
+      </label>
+      <span style="font-size:12px;color:var(--text-muted);" id="rowInfo">
+        Menampilkan 1–100 dari {{ result_data | length }} baris
+      </span>
+    </div>
+  </div>
+
   <!-- Tabel Hasil -->
   <div class="table-wrapper">
-    <table>
+    <table id="hasilTable">
       <thead>
         <tr>
           <th>#</th><th>Hari</th><th>Jam</th><th>Menit</th>
           <th>Motor</th><th>Mobil</th><th>Bus</th><th>Truk</th><th>Total</th>
-          <th>Prediksi Kepadatan</th>
+          <th>Prediksi Kepadatan</th><th>Konfiden</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="hasilTbody">
         {% for row in result_data %}
-        <tr>
+        <tr data-kelas="{{ row.tingkat_kepadatan | lower }}" data-idx="{{ loop.index }}">
           <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
           <td>{{ row.hari }}</td>
           <td class="td-mono">{{ row.jam }}:00</td>
@@ -209,17 +265,19 @@
               <span class="dot"></span>{{ row.tingkat_kepadatan }}
             </span>
           </td>
+          <td class="td-mono" style="color:var(--text-muted);">
+            {{ row.confidence | default('—') }}%
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <div class="pagination">
-    <button class="page-btn">‹</button>
-    <button class="page-btn active">1</button>
-    <button class="page-btn">2</button>
-    <button class="page-btn">›</button>
+  <!-- Pagination -->
+  <div class="flex items-center justify-between mt-3" id="paginationWrap">
+    <div style="font-size:12px;color:var(--text-muted);" id="pageInfo">Halaman 1</div>
+    <div class="pagination" id="paginationBtns"></div>
   </div>
 </div>
 {% endif %}
@@ -262,5 +320,168 @@
     document.getElementById('loadingOverlay').classList.remove('hidden');
     document.getElementById('loadingText').textContent = 'Menjalankan klasifikasi...';
   });
+
+  /* ── Pagination untuk hasil klasifikasi ── */
+  const PAGE_SIZE_DEFAULT = 100;
+  let currentPage   = 1;
+  let showAllMode   = false;
+  let activeFilter  = '';
+
+  function getVisibleRows() {
+    return Array.from(document.querySelectorAll('#hasilTbody tr')).filter(row => {
+      if (!activeFilter) return true;
+      return row.dataset.kelas === activeFilter;
+    });
+  }
+
+  function renderPage() {
+    const rows = getVisibleRows();
+    const total = rows.length;
+    if (total === 0) {
+      document.getElementById('rowInfo').textContent = 'Tidak ada data';
+      document.getElementById('paginationBtns').innerHTML = '';
+      rows.forEach(r => r.style.display = '');
+      return;
+    }
+
+    if (showAllMode) {
+      rows.forEach(r => r.style.display = '');
+      // Sembunyikan baris yang tidak sesuai filter
+      Array.from(document.querySelectorAll('#hasilTbody tr')).forEach(r => {
+        if (activeFilter && r.dataset.kelas !== activeFilter) r.style.display = 'none';
+        else r.style.display = '';
+      });
+      document.getElementById('rowInfo').textContent = `Menampilkan semua ${total} baris`;
+      document.getElementById('paginationBtns').innerHTML = '';
+      document.getElementById('pageInfo').textContent = '';
+      return;
+    }
+
+    const totalPages = Math.ceil(total / PAGE_SIZE_DEFAULT);
+    if (currentPage > totalPages) currentPage = 1;
+    const start = (currentPage - 1) * PAGE_SIZE_DEFAULT;
+    const end   = Math.min(start + PAGE_SIZE_DEFAULT, total);
+
+    // Sembunyikan semua, tampilkan yang di halaman ini
+    Array.from(document.querySelectorAll('#hasilTbody tr')).forEach(r => r.style.display = 'none');
+    rows.slice(start, end).forEach(r => r.style.display = '');
+
+    document.getElementById('rowInfo').textContent =
+      `Menampilkan ${start + 1}–${end} dari ${total} baris`;
+    document.getElementById('pageInfo').textContent = `Halaman ${currentPage} / ${totalPages}`;
+
+    // Render tombol pagination
+    let btns = '';
+    btns += `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+    for (let i = 1; i <= totalPages; i++) {
+      if (totalPages <= 7 || Math.abs(i - currentPage) <= 2 || i===1 || i===totalPages) {
+        btns += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+      } else if (Math.abs(i - currentPage) === 3) {
+        btns += `<button class="page-btn" disabled>…</button>`;
+      }
+    }
+    btns += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+    document.getElementById('paginationBtns').innerHTML = btns;
+  }
+
+  function goPage(p) {
+    const total = getVisibleRows().length;
+    const maxP  = Math.ceil(total / PAGE_SIZE_DEFAULT);
+    if (p < 1 || p > maxP) return;
+    currentPage = p;
+    renderPage();
+  }
+
+  function filterHasil() {
+    activeFilter = document.getElementById('filterKelas').value;
+    currentPage  = 1;
+    renderPage();
+  }
+
+  function toggleShowAll(cb) {
+    showAllMode = cb.checked;
+    currentPage = 1;
+    const wrap  = document.getElementById('paginationWrap');
+    renderPage();
+  }
+
+  // Init pagination hasil klasifikasi
+  if (document.getElementById('hasilTbody')) {
+    renderPage();
+  }
+
+  /* ════════════════════════════════════
+     PAGINATION PREVIEW (Step 2)
+     ════════════════════════════════════ */
+  var PREV_PAGE_SIZE = 100;
+  var prevPage       = 1;
+  var prevShowAll    = false;
+
+  function getPreviewRows() {
+    return Array.from(document.querySelectorAll('#previewTbody tr') || []);
+  }
+
+  function renderPreview() {
+    var rows  = getPreviewRows();
+    var total = rows.length;
+    if (total === 0) return;
+
+    var infoEl = document.getElementById('previewInfo');
+    var pageEl = document.getElementById('previewPageInfo');
+    var btnEl  = document.getElementById('previewPaginBtns');
+    var wrapEl = document.getElementById('previewPaginWrap');
+
+    if (prevShowAll) {
+      rows.forEach(function(r) { r.style.display = ''; });
+      if (infoEl) infoEl.textContent = 'Menampilkan semua ' + total + ' baris';
+      if (btnEl)  btnEl.innerHTML    = '';
+      if (pageEl) pageEl.textContent = '';
+      return;
+    }
+
+    var totalPages = Math.ceil(total / PREV_PAGE_SIZE);
+    if (prevPage > totalPages) prevPage = 1;
+    var start = (prevPage - 1) * PREV_PAGE_SIZE;
+    var end   = Math.min(start + PREV_PAGE_SIZE, total);
+
+    rows.forEach(function(r, i) { r.style.display = (i >= start && i < end) ? '' : 'none'; });
+
+    if (infoEl) infoEl.textContent = 'Menampilkan ' + (start+1) + '-' + end + ' dari ' + total + ' baris';
+    if (pageEl) pageEl.textContent = 'Halaman ' + prevPage + ' / ' + totalPages;
+
+    if (btnEl) {
+      var btns = '';
+      btns += '<button class="page-btn" onclick="prevGoPage(' + (prevPage-1) + ')" ' + (prevPage===1?'disabled':'') + '>&#8249;</button>';
+      for (var i = 1; i <= totalPages; i++) {
+        if (totalPages <= 7 || Math.abs(i - prevPage) <= 2 || i===1 || i===totalPages) {
+          btns += '<button class="page-btn ' + (i===prevPage?'active':'') + '" onclick="prevGoPage(' + i + ')">' + i + '</button>';
+        } else if (Math.abs(i - prevPage) === 3) {
+          btns += '<button class="page-btn" disabled>&hellip;</button>';
+        }
+      }
+      btns += '<button class="page-btn" onclick="prevGoPage(' + (prevPage+1) + ')" ' + (prevPage===totalPages?'disabled':'') + '>&#8250;</button>';
+      btnEl.innerHTML = btns;
+    }
+  }
+
+  function prevGoPage(p) {
+    var rows  = getPreviewRows();
+    var total = rows.length;
+    var maxP  = Math.ceil(total / PREV_PAGE_SIZE);
+    if (p < 1 || p > maxP) return;
+    prevPage = p;
+    renderPreview();
+  }
+
+  function previewToggleAll(cb) {
+    prevShowAll = cb.checked;
+    prevPage    = 1;
+    renderPreview();
+  }
+
+  // Init preview saat halaman dimuat
+  if (document.getElementById('previewTbody')) {
+    renderPreview();
+  }
 </script>
 {% endblock %}
