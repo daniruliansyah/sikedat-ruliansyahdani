@@ -1,40 +1,48 @@
-# =========================
-# Python & Byte-compiled
-# =========================
+# ── Python ──
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
 
-# =========================
-# Database Lokal
-# =========================
-*.db
-*.sqlite3
-sikedat.db
+# ── Notes ──
+*.txt
 
-# =========================
-# Virtual Environments (Jika pakai venv Python)
-# =========================
+# ── Virtual Environment ──
 venv/
 env/
 .venv/
 
-# =========================
-# Node.js & NPM (Jika ada frontend / script npm)
-# =========================
-node_modules/
-npm-debug.log*
-yarn-error.log*
+# ── Database ──
+*.db
+*.sqlite
+*.sqlite3
 
-# =========================
-# Environment Variables & Keamanan
-# =========================
-.env
-.env.local
+# ── Model ML (dibuat ulang dengan train_models.py) ──
+models/*.pkl
+models/*.joblib
+models/metadata.json
 
-# =========================
-# OS & Editor Files (Windows / VS Code)
-# =========================
+# ── File upload sementara (dibuat saat runtime) ──
+uploads/
+
+# ── Dataset dummy (opsional — bisa di-commit kalau mau) ──
+# dataset_dummy_berlabel.csv
+# dataset_dummy_input.csv
+
+# ── IDE & OS ──
 .vscode/
 .idea/
+*.DS_Store
 Thumbs.db
+
+# ── Environment variables ──
+.env
+.env.*
+instance/
+
+# ── Logs ──
+*.log

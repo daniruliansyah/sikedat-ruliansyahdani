@@ -14,13 +14,58 @@
 <div class="alert alert-info fade-in" style="margin-bottom: 20px;">
   <span class="alert-icon">💡</span>
   <div class="alert-body">
-    <div class="alert-title">Human-in-the-Loop Validation</div>
+    <div class="alert-title">Human-in-the-Loop Validation — Sistem Antrian</div>
     <div class="alert-desc">
-      Validasi dilakukan oleh tenaga ahli Dishub. Label yang dikoreksi akan digunakan
-      untuk meningkatkan akurasi model pada sesi <em>retrain</em> berikutnya.
+      Satu batch data harus <strong>selesai divalidasi seluruhnya</strong> sebelum batch berikutnya
+      dapat dikirim. Label yang dikoreksi akan digunakan untuk retrain model.
+      {% if antrian_count and antrian_count > 1 %}
+      <br><span style="color:var(--warning);">⚠️ Terdapat <strong>{{ antrian_count }}</strong> batch dalam antrian.</span>
+      {% endif %}
     </div>
   </div>
 </div>
+
+<!-- ── INFO ANTRIAN BATCH ── -->
+{% if antrian_info and antrian_info | length > 0 %}
+<div class="card fade-in" style="margin-bottom: 20px;">
+  <div class="card-header">
+    <div class="card-title">
+      <span class="dot" style="background:var(--warning);"></span>
+      Antrian Batch Validasi
+    </div>
+    <span class="badge badge-warning">{{ antrian_count }} batch menunggu</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    {% for b in antrian_info %}
+    <div style="
+      padding:10px 16px;
+      border-radius:var(--radius-md);
+      border:1px solid {{ 'var(--border-active)' if b.is_current else 'var(--border)' }};
+      background:{{ 'var(--primary-glow)' if b.is_current else 'var(--bg-elevated)' }};
+      display:flex;align-items:center;gap:16px;
+    ">
+      <div style="flex:1;">
+        <div class="flex items-center gap-2" style="margin-bottom:3px;">
+          {% if b.is_current %}
+          <span class="badge badge-primary">🔄 Sedang Divalidasi</span>
+          {% else %}
+          <span class="badge badge-info">⏳ Menunggu</span>
+          {% endif %}
+          <span style="font-size:12px;color:var(--text-muted);">
+            {{ b.nama_file or 'Tanpa nama' }}
+          </span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);">
+          {{ b.jumlah }} baris ·
+          Dikirim: {{ b.dibuat.strftime('%d %b %Y %H:%M') if b.dibuat else '—' }} ·
+          Batch ID: <span class="text-mono" style="font-size:11px;">{{ b.batch_id[:12] }}...</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <!-- ── STAT CARDS ── -->
 <div class="grid grid-4 fade-in" style="margin-bottom: 20px;">
@@ -82,18 +127,24 @@
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
       <!-- Setujui semua terpilih = tandai valid langsung -->
       <button class="btn btn-success btn-sm" id="btnSetujuiSemua"
-              onclick="bulkSetujui()" disabled>
+              onclick="bulkSetujui()">
         ✅ Setujui Terpilih
       </button>
       <!-- Koreksi semua terpilih = buka dropdown pilih label -->
       <button class="btn btn-warning btn-sm" id="btnKoreksiSemua"
-              onclick="bulkKoreksiModal()" disabled>
+              onclick="bulkKoreksiModal()">
         ✏️ Koreksi Terpilih
       </button>
-      <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm"
-         id="btnSave">
-        💾 Simpan Validasi
-      </a>
+      <button type="button" class="btn btn-primary btn-sm"
+              id="btnSaveTerpilih" onclick="submitValidasi()"
+              title="Setujui baris terlebih dahulu, lalu simpan">
+        💾 Simpan Terpilih
+      </button>
+      <!-- Hidden form untuk POST -->
+      <form method="POST" action="{{ url_for('save_validated') }}" id="validasiForm">
+        <input type="hidden" name="changes"      id="changesInput"    value="[]" />
+        <input type="hidden" name="selected_ids" id="selectedIdsInput" value="[]" />
+      </form>
     </div>
   </div>
 
@@ -133,6 +184,7 @@
                      style="accent-color:var(--primary);cursor:pointer;" />
             </th>
             <th>#</th>
+            <th>Tanggal</th>
             <th>Hari</th>
             <th>Jam</th>
             <th>Menit</th>
@@ -150,15 +202,18 @@
           {% set sample_rows = validation_data | default([]) %}
           {% if sample_rows %}
             {% for row in sample_rows %}
-            <tr data-kategori="{{ row.prediksi | lower }}"
-                data-status="{{ row.status | lower }}"
-                data-hari="{{ row.hari | lower }}" class="table-row">
+            <tr data-kategori="{{ row.tingkat_kepadatan | lower if row.tingkat_kepadatan else '' }}"
+                data-status="{{ row.status_validasi | lower if row.status_validasi else '' }}"
+                data-hari="{{ row.hari | lower }}"
+                data-batch-id="{{ row.batch_id or '' }}"
+                class="table-row">
               <td>
                 <input type="checkbox" class="row-check" data-id="{{ row.id }}"
                        style="accent-color:var(--primary);cursor:pointer;"
                        onchange="onCheckChange()">
               </td>
               <td class="td-mono" style="color:var(--text-muted);">{{ loop.index }}</td>
+              <td style="font-size:11.5px;color:var(--text-muted);">{{ row.tanggal.strftime('%d/%m/%Y') if row.tanggal else '—' }}</td>
               <td>{{ row.hari }}</td>
               <td class="td-mono">{{ row.jam }}:00</td>
               <td class="td-mono">{{ row.menit }}</td>
@@ -166,27 +221,27 @@
               <td class="td-mono" style="color:var(--cyan);">{{ row.mobil }}</td>
               <td class="td-mono" style="color:var(--success);">{{ row.bus }}</td>
               <td class="td-mono" style="color:var(--warning);">{{ row.truk }}</td>
-              <td class="td-mono" style="font-weight:600;">{{ row.total }}</td>
+              <td class="td-mono" style="font-weight:600;">{{ row.total_kendaraan }}</td>
               <td>
-                <span class="badge badge-{{ row.prediksi | lower }}">
-                  <span class="dot"></span>{{ row.prediksi }}
+                <span class="badge badge-{{ row.tingkat_kepadatan | lower if row.tingkat_kepadatan else 'info' }}">
+                  <span class="dot"></span>{{ row.tingkat_kepadatan or '—' }}
                 </span>
               </td>
               <td>
                 <select class="form-control label-select"
                         data-id="{{ row.id }}"
-                        data-original="{{ row.prediksi | lower }}"
+                        data-original="{{ row.tingkat_kepadatan | lower if row.tingkat_kepadatan else 'sedang' }}"
                         style="width:108px;font-size:12px;padding:5px 8px;"
                         onchange="onLabelChange(this)">
-                  <option value="rendah" {{ 'selected' if row.label_final=='Rendah' }}>🟢 Rendah</option>
-                  <option value="sedang" {{ 'selected' if row.label_final=='Sedang' }}>🟡 Sedang</option>
-                  <option value="tinggi" {{ 'selected' if row.label_final=='Tinggi' }}>🔴 Tinggi</option>
+                  <option value="rendah" {{ 'selected' if (row.label_final or row.tingkat_kepadatan)=='Rendah' }}>🟢 Rendah</option>
+                  <option value="sedang" {{ 'selected' if (row.label_final or row.tingkat_kepadatan)=='Sedang' }}>🟡 Sedang</option>
+                  <option value="tinggi" {{ 'selected' if (row.label_final or row.tingkat_kepadatan)=='Tinggi' }}>🔴 Tinggi</option>
                 </select>
               </td>
               <td>
-                <span class="badge badge-{{ 'success' if row.status=='validated' else ('warning' if row.status=='corrected' else 'info') }}"
+                <span class="badge badge-{{ 'success' if row.status_validasi=='validated' else ('warning' if row.status_validasi=='corrected' else 'info') }}"
                       id="statusBadge-{{ row.id }}">
-                  {{ '✅ Valid' if row.status=='validated' else ('✏️ Dikoreksi' if row.status=='corrected' else '⏳ Pending') }}
+                  {{ '✅ Valid' if row.status_validasi=='validated' else ('✏️ Dikoreksi' if row.status_validasi=='corrected' else '⏳ Pending') }}
                 </span>
               </td>
             </tr>
@@ -247,16 +302,8 @@
 
     <!-- Pagination — TIDAK tertutup sticky bar karena bar ada di dalam card -->
     <div class="flex items-center justify-between" style="margin-top: 16px;">
-      <div style="font-size:12px;color:var(--text-muted);" id="paginationInfo">
-        Halaman 1
-      </div>
-      <div class="pagination">
-        <button class="page-btn">‹</button>
-        <button class="page-btn active">1</button>
-        <button class="page-btn">2</button>
-        <button class="page-btn">3</button>
-        <button class="page-btn">›</button>
-      </div>
+      <div style="font-size:12px;color:var(--text-muted);" id="paginationInfo"></div>
+      <div class="pagination" id="paginationBtns"></div>
     </div>
   </div>
 
@@ -299,9 +346,9 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <a href="{{ url_for('save_validated') }}" class="btn btn-primary btn-sm">
-          💾 Simpan Sekarang
-        </a>
+        <button type="button" class="btn btn-primary btn-sm" onclick="submitValidasi()">
+          💾 Simpan Terpilih
+        </button>
         <button class="btn btn-ghost btn-sm" onclick="discardChanges()">
           Batalkan
         </button>
@@ -348,139 +395,349 @@
 
 {% block extra_scripts %}
 <script>
-  let changedRows   = new Set();
-  let validatedRows = new Set();
-  const TOTAL       = parseInt('{{ total_data | default(8) }}') || 8;
+/* validasi.html - semua fungsi interaktif */
 
-  /* ── Label change ── */
-  function onLabelChange(select) {
-    const id       = select.dataset.id;
-    const original = select.dataset.original;
-    const badge    = document.getElementById('statusBadge-' + id);
-    if (select.value !== original) {
-      changedRows.add(id);
-      badge.className   = 'badge badge-warning';
-      badge.textContent = '✏️ Dikoreksi';
-    } else {
-      changedRows.delete(id);
-      badge.className   = 'badge badge-info';
-      badge.textContent = '⏳ Pending';
+/* Set berisi id (string) baris yang sudah di-approve */
+var approvedSet = new Set();
+
+/* Shorthand getElementById */
+function g(id) { return document.getElementById(id); }
+
+/* Hitung semua checkbox .row-check di dalam tabel */
+function allCB() {
+  return Array.from(document.querySelectorAll('#dataTable .row-check'));
+}
+
+/* Hitung checkbox yang ter-checked */
+function checkedCB() {
+  return allCB().filter(function(c){ return c.checked; });
+}
+
+/* Update state semua tombol + info + master checkbox */
+function syncUI() {
+  var nChk = checkedCB().length;
+  var nVis = allCB().filter(function(c){
+    var tr = c.parentNode ? c.parentNode.parentNode : null;
+    return tr && tr.style.display !== 'none';
+  }).length;
+  var nApp = approvedSet.size;
+
+  /* Tombol aksi */
+  var bS = g('btnSetujuiSemua');
+  var bK = g('btnKoreksiSemua');
+  var bP = g('btnSaveTerpilih');
+  if (bS) bS.disabled = (nChk === 0);
+  if (bK) bK.disabled = (nChk === 0);
+  if (bP) bP.disabled = (nApp === 0);
+
+  /* Info N baris dipilih */
+  var info = g('selectedInfo');
+  var cnt  = g('selectedCount');
+  if (info) info.style.display = nChk > 0 ? '' : 'none';
+  if (cnt)  cnt.textContent    = nChk;
+
+  /* Master checkbox indeterminate */
+  var master = g('checkAll');
+  if (master) {
+    if (nChk === 0)       { master.checked = false; master.indeterminate = false; }
+    else if (nChk===nVis) { master.checked = true;  master.indeterminate = false; }
+    else                  { master.checked = false;  master.indeterminate = true;  }
+  }
+
+  /* In-card action bar */
+  var bar = g('inCardActions');
+  var bi  = g('inCardInfo');
+  if (bar) bar.style.display = nApp > 0 ? '' : 'none';
+  if (bi)  bi.textContent    = nApp + ' baris siap disimpan';
+}
+
+/* ================================================
+   1. SELECT ALL / DESELECT ALL
+   ================================================ */
+function toggleSelectAll() {
+  var master = g('checkAll');
+  if (!master) return;
+  var val = master.checked;
+  allCB().forEach(function(cb) {
+    var tr = cb.parentNode ? cb.parentNode.parentNode : null;
+    if (tr && tr.style.display !== 'none') {
+      cb.checked = val;
     }
-    updateCounters();
-    updateInCardBar();
+  });
+  syncUI();
+}
+
+/* ================================================
+   2. DIPANGGIL TIAP ROW CHECKBOX BERUBAH
+   ================================================ */
+function onCheckChange() {
+  syncUI();
+}
+
+/* ================================================
+   3. LABEL DROPDOWN BERUBAH - update badge status
+   ================================================ */
+function onLabelChange(sel) {
+  var id  = sel.getAttribute('data-id');
+  var ori = sel.getAttribute('data-original');
+  var val = sel.value;
+  var bdg = document.getElementById('statusBadge-' + id);
+
+  /* Jika sudah di-approve tapi label diubah lagi, batalkan approval */
+  if (approvedSet.has(id)) {
+    approvedSet.delete(id);
   }
 
-  /* ── Setujui semua terpilih (tandai valid tanpa ubah label) ── */
-  function bulkSetujui() {
-    const checked = document.querySelectorAll('.row-check:checked');
-    checked.forEach(cb => {
-      const id   = cb.dataset.id;
-      const badge = document.getElementById('statusBadge-' + id);
-      validatedRows.add(id);
-      badge.className   = 'badge badge-success';
-      badge.textContent = '✅ Valid';
-    });
-    updateCounters();
-    updateInCardBar();
-    clearSelection();
+  if (bdg) {
+    if (val !== ori) {
+      bdg.className   = 'badge badge-warning';
+      bdg.textContent = 'Dikoreksi';
+    } else {
+      bdg.className   = 'badge badge-info';
+      bdg.textContent = 'Pending';
+    }
   }
 
-  /* ── Modal koreksi massal ── */
-  function bulkKoreksiModal() {
-    if (document.querySelectorAll('.row-check:checked').length === 0) return;
-    document.getElementById('koreksiModal').classList.add('show');
+  syncUI();
+}
+
+/* ================================================
+   4. SETUJUI TERPILIH - tandai badge jadi Valid
+   ================================================ */
+function bulkSetujui() {
+  var checked = checkedCB();
+  if (checked.length === 0) {
+    alert('Pilih minimal satu baris terlebih dahulu.');
+    return;
+  }
+  checked.forEach(function(cb) {
+    var id  = cb.getAttribute('data-id');
+    var bdg = document.getElementById('statusBadge-' + id);
+    approvedSet.add(id);
+    if (bdg) {
+      bdg.className   = 'badge badge-success';
+      bdg.textContent = 'Valid';
+    }
+  });
+  syncUI();
+}
+
+/* ================================================
+   5. KOREKSI MASSAL - buka modal pilih label
+   ================================================ */
+function bulkKoreksiModal() {
+  if (checkedCB().length === 0) {
+    alert('Pilih minimal satu baris.');
+    return;
+  }
+  var m = g('koreksiModal');
+  if (m) m.classList.add('show');
+}
+
+function closeModal() {
+  var m = g('koreksiModal');
+  if (m) m.classList.remove('show');
+}
+
+function bulkSetLabel(label) {
+  checkedCB().forEach(function(cb) {
+    var id = cb.getAttribute('data-id');
+    var s  = document.querySelector('.label-select[data-id="' + id + '"]');
+    if (s) { s.value = label; onLabelChange(s); }
+  });
+  closeModal();
+}
+
+/* ================================================
+   6. SIMPAN TERPILIH - hanya yg sudah approved
+   ================================================ */
+function submitValidasi() {
+  if (approvedSet.size === 0) {
+    alert('Belum ada baris yang disetujui. Klik "Setujui Terpilih" dahulu.');
+    return;
   }
 
-  function closeModal() {
-    document.getElementById('koreksiModal').classList.remove('show');
+  var changes = [];
+  approvedSet.forEach(function(id) {
+    var s   = document.querySelector('.label-select[data-id="' + id + '"]');
+    var row = s ? s.closest('tr') : null;
+    if (s) {
+      changes.push({
+        id      : parseInt(id, 10),
+        label   : s.value,
+        batch_id: row && row.getAttribute('data-batch-id') ? row.getAttribute('data-batch-id') : null
+      });
+    }
+  });
+
+  if (changes.length === 0) {
+    alert('Tidak ada data untuk disimpan.');
+    return;
   }
 
-  function bulkSetLabel(label) {
-    const icons  = { rendah:'🟢 Rendah', sedang:'🟡 Sedang', tinggi:'🔴 Tinggi' };
-    document.querySelectorAll('.row-check:checked').forEach(cb => {
-      const id     = cb.dataset.id;
-      const select = document.querySelector(`.label-select[data-id="${id}"]`);
-      if (select) {
-        select.value = label;
-        onLabelChange(select);
-      }
-    });
-    closeModal();
-    clearSelection();
+  var ids = Array.from(approvedSet).map(function(id) { return parseInt(id, 10); });
+
+  var ci  = g('changesInput');
+  var si  = g('selectedIdsInput');
+  var ov  = g('loadingOverlay');
+  var lt  = g('loadingText');
+  var frm = g('validasiForm');
+
+  if (ci)  ci.value  = JSON.stringify(changes);
+  if (si)  si.value  = JSON.stringify(ids);
+  if (ov)  ov.classList.remove('hidden');
+  if (lt)  lt.textContent = 'Menyimpan ' + changes.length + ' baris...';
+  if (frm) frm.submit();
+}
+
+/* ================================================
+   7. CLEAR SELECTION
+   ================================================ */
+function clearSelection() {
+  allCB().forEach(function(cb) { cb.checked = false; });
+  var m = g('checkAll');
+  if (m) { m.checked = false; m.indeterminate = false; }
+  syncUI();
+}
+
+/* ================================================
+   8. FILTER TABEL
+   ================================================ */
+function filterTable() {
+  var k = g('filterKategori') ? g('filterKategori').value : '';
+  var s = g('filterStatus')   ? g('filterStatus').value   : '';
+  var q = g('searchInput')    ? g('searchInput').value.toLowerCase() : '';
+  var n = 0;
+
+  document.querySelectorAll('.table-row').forEach(function(row) {
+    var kat  = row.getAttribute('data-kategori') || '';
+    var stat = row.getAttribute('data-status')   || '';
+    var hari = row.getAttribute('data-hari')     || '';
+    var txt  = row.textContent.toLowerCase();
+    var ok   = (!k || kat  === k)
+            && (!s || stat === s)
+            && (!q || hari.indexOf(q) >= 0 || txt.indexOf(q) >= 0);
+    row.style.display = ok ? '' : 'none';
+    if (ok) n++;
+  });
+
+  var ti = g('tableInfo');
+  if (ti) ti.textContent = 'Menampilkan ' + n + ' baris';
+  currentPage = 1;
+  renderPagination();
+  syncUI();
+}
+
+/* ================================================
+   9. TAB SWITCH
+   ================================================ */
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tabs .tab').forEach(function(t) {
+    t.classList.remove('active');
+  });
+  btn.classList.add('active');
+  var tv = g('viewTable');
+  var sv = g('viewSummary');
+  if (tv) tv.style.display = tab === 'table'   ? '' : 'none';
+  if (sv) sv.style.display = tab === 'summary' ? '' : 'none';
+}
+
+/* ================================================
+   10. DISCARD
+   ================================================ */
+function discardChanges() {
+  if (confirm('Batalkan semua perubahan?')) location.reload();
+}
+
+/* ================================================
+   PAGINATION
+   ================================================ */
+var currentPage  = 1;
+var PAGE_SIZE    = 100;
+
+function getPageableRows() {
+  /* Ambil hanya row dari DB (bukan placeholder), yang tidak hidden oleh filter */
+  return Array.from(document.querySelectorAll(
+    '#dataTable tbody tr.table-row'
+  )).filter(function(r) { return r.style.display !== 'none'; });
+}
+
+function renderPagination() {
+  var rows  = getPageableRows();
+  var total = rows.length;
+  var totalPages = total > 0 ? Math.ceil(total / PAGE_SIZE) : 1;
+
+  /* Pastikan currentPage valid */
+  if (currentPage > totalPages) currentPage = 1;
+
+  var start = (currentPage - 1) * PAGE_SIZE;
+  var end   = Math.min(start + PAGE_SIZE, total);
+
+  /* Tampilkan/sembunyikan baris sesuai halaman */
+  rows.forEach(function(r, i) {
+    r.style.display = (i >= start && i < end) ? '' : 'none';
+  });
+
+  /* Update info teks */
+  var pi = g('paginationInfo');
+  if (pi) {
+    if (total === 0) {
+      pi.textContent = 'Tidak ada data';
+    } else {
+      pi.textContent = 'Menampilkan ' + (start+1) + '-' + end + ' dari ' + total + ' baris';
+    }
   }
 
-  /* ── Select all / clear ── */
-  function toggleSelectAll() {
-    const all = document.getElementById('checkAll').checked;
-    document.querySelectorAll('.table-row:not([style*="display: none"]) .row-check')
-      .forEach(cb => { cb.checked = all; });
-    onCheckChange();
+  /* Render tombol pagination — hanya tampilkan jika > 1 halaman */
+  var pb = g('paginationBtns');
+  if (!pb) return;
+  pb.innerHTML = '';
+  if (totalPages <= 1) return; /* Sembunyikan pagination jika hanya 1 halaman */
+
+  function makeBtn(label, page, isActive, isDisabled) {
+    var btn = document.createElement('button');
+    btn.className   = 'page-btn' + (isActive ? ' active' : '');
+    btn.textContent = label;
+    btn.disabled    = isDisabled;
+    if (!isDisabled && !isActive) {
+      btn.onclick = function() { goPage(page); };
+    }
+    pb.appendChild(btn);
   }
 
-  function onCheckChange() {
-    const n = document.querySelectorAll('.row-check:checked').length;
-    const info = document.getElementById('selectedInfo');
-    info.style.display = n > 0 ? '' : 'none';
-    document.getElementById('selectedCount').textContent = n;
-    document.getElementById('btnSetujuiSemua').disabled  = n === 0;
-    document.getElementById('btnKoreksiSemua').disabled  = n === 0;
+  makeBtn('<', currentPage - 1, false, currentPage === 1);
+
+  for (var i = 1; i <= totalPages; i++) {
+    var show = (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 2);
+    var showDot = (Math.abs(i - currentPage) === 3 && i !== 1 && i !== totalPages);
+    if (show) {
+      makeBtn(i, i, i === currentPage, i === currentPage);
+    } else if (showDot) {
+      makeBtn('...', i, false, true);
+    }
   }
 
-  function clearSelection() {
-    document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
-    document.getElementById('checkAll').checked = false;
-    onCheckChange();
-  }
+  makeBtn('>', currentPage + 1, false, currentPage === totalPages);
+}
 
-  /* ── Counters ── */
-  function updateCounters() {
-    const nValidated = validatedRows.size;
-    const nCorrected = changedRows.size;
-    document.getElementById('statValidated').textContent = nValidated;
-    document.getElementById('statCorrected').textContent = nCorrected;
-    document.getElementById('statPending').textContent   =
-      Math.max(0, TOTAL - nValidated - nCorrected);
-    const pct = TOTAL > 0 ? Math.round((nValidated + nCorrected) / TOTAL * 100) : 0;
-    document.getElementById('pctValidasi').textContent = pct + '% selesai';
-  }
+function goPage(p) {
+  var rows  = getPageableRows();
+  var total = rows.length;
+  var maxP  = Math.ceil(total / PAGE_SIZE);
+  if (p < 1 || p > maxP) return;
+  currentPage = p;
+  renderPagination();
+}
 
-  /* ── In-card action bar (bukan fixed, tidak menutupi pagination) ── */
-  function updateInCardBar() {
-    const total = changedRows.size + validatedRows.size;
-    const bar   = document.getElementById('inCardActions');
-    bar.style.display = total > 0 ? '' : 'none';
-    document.getElementById('inCardInfo').textContent =
-      total + ' perubahan belum disimpan';
-  }
-
-  /* ── Filter tabel ── */
-  function filterTable() {
-    const kategori = document.getElementById('filterKategori').value;
-    const status   = document.getElementById('filterStatus').value;
-    const search   = document.getElementById('searchInput').value.toLowerCase();
-    let visible = 0;
-    document.querySelectorAll('.table-row').forEach(row => {
-      const ok = (!kategori || row.dataset.kategori === kategori)
-              && (!status   || row.dataset.status   === status)
-              && (!search   || row.dataset.hari.includes(search)
-                            || row.textContent.toLowerCase().includes(search));
-      row.style.display = ok ? '' : 'none';
-      if (ok) visible++;
-    });
-    document.getElementById('tableInfo').textContent =
-      'Menampilkan ' + visible + ' baris';
-  }
-
-  /* ── Tab switch ── */
-  function switchTab(tab, btn) {
-    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('viewTable').style.display   = tab === 'table'   ? '' : 'none';
-    document.getElementById('viewSummary').style.display = tab === 'summary' ? '' : 'none';
-  }
-
-  function discardChanges() {
-    if (confirm('Yakin ingin membatalkan semua perubahan?')) location.reload();
-  }
+/* Jalankan syncUI + pagination saat DOM siap */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    syncUI();
+    renderPagination();
+  });
+} else {
+  syncUI();
+  renderPagination();
+}
 </script>
 {% endblock %}
