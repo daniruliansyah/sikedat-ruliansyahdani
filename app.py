@@ -112,7 +112,7 @@ def inject_globals():
     return {'now': datetime.utcnow()}
 
 # ──────────────────────────────────────────────────────────────
-#  HELPER — statistik dataset untuk beranda / dashboard
+#  HELPER — statistik dasar dari tabel dataset
 # ──────────────────────────────────────────────────────────────
 def get_stats():
     total_data          = Dataset.query.count()
@@ -130,6 +130,7 @@ def get_stats():
     pct_tinggi = round(count_tinggi / total_data * 100) if total_data else 0
     return dict(
         total_data          = f'{total_data:,}',
+        total_data_int      = total_data,
         total_kendaraan_all = f'{total_kendaraan_all:,}',
         total_motor         = f'{total_motor:,}',
         total_mobil         = f'{total_mobil:,}',
@@ -144,19 +145,229 @@ def get_stats():
         pct_tinggi          = pct_tinggi,
     )
 
+
+# ──────────────────────────────────────────────────────────────
+#  HELPER — data untuk halaman Beranda (index.html)
+# ──────────────────────────────────────────────────────────────
+def get_index_data():
+    """Hitung komposisi kendaraan rata-rata per hari dari DB."""
+    import statistics
+
+    HARI_MAP = {
+        'Senin':1,'Selasa':2,'Rabu':3,
+        'Kamis':4,'Jumat':5,'Sabtu':6,'Minggu':7
+    }
+    HARI_KEY = {
+        'Senin':'senin','Selasa':'selasa','Rabu':'rabu',
+        'Kamis':'kamis','Jumat':'jumat','Sabtu':'sabtu','Minggu':'minggu'
+    }
+
+    # Ambil semua data dari DB
+    rows = Dataset.query.with_entities(
+        Dataset.hari, Dataset.motor, Dataset.mobil,
+        Dataset.bus,  Dataset.truk
+    ).all()
+
+    if not rows:
+        # Kembalikan data kosong
+        zero4 = [0, 0, 0, 0]
+        return {
+            'komposisi_per_hari': {h: zero4 for h in HARI_KEY.values()},
+            'avg_motor': 0, 'avg_mobil': 0, 'avg_bus': 0, 'avg_truk': 0,
+            'avg_motor_pct': 0, 'avg_mobil_pct': 0,
+            'avg_bus_pct': 0,   'avg_truk_pct': 0,
+            'last_file_name': None, 'last_file_rows': 0,
+            'last_chart_labels': [], 'last_chart_data': [],
+        }
+
+    # Kelompokkan per hari
+    from collections import defaultdict
+    hari_data = defaultdict(lambda: {'motor':[],'mobil':[],'bus':[],'truk':[]})
+    for r in rows:
+        hari_data[r.hari]['motor'].append(r.motor)
+        hari_data[r.hari]['mobil'].append(r.mobil)
+        hari_data[r.hari]['bus'].append(r.bus)
+        hari_data[r.hari]['truk'].append(r.truk)
+
+    def avg(lst): return round(sum(lst)/len(lst), 1) if lst else 0
+
+    komposisi_per_hari = {}
+    for hari_id, key in HARI_KEY.items():
+        d = hari_data.get(hari_id, {'motor':[0],'mobil':[0],'bus':[0],'truk':[0]})
+        komposisi_per_hari[key] = [
+            avg(d['motor']), avg(d['mobil']), avg(d['bus']), avg(d['truk'])
+        ]
+
+    # Rata-rata semua hari
+    all_motor = [r.motor for r in rows]
+    all_mobil = [r.mobil for r in rows]
+    all_bus   = [r.bus   for r in rows]
+    all_truk  = [r.truk  for r in rows]
+    a_motor = avg(all_motor)
+    a_mobil = avg(all_mobil)
+    a_bus   = avg(all_bus)
+    a_truk  = avg(all_truk)
+    total_avg = a_motor + a_mobil + a_bus + a_truk or 1
+
+    # Data file terakhir diproses (batch_id terbaru)
+    last_batch = db.session.query(Dataset.batch_id, Dataset.nama_file).filter(
+        Dataset.batch_id.isnot(None)
+    ).order_by(Dataset.created_at.desc()).first()
+
+    last_file_name  = last_batch.nama_file if last_batch else None
+    last_chart_labels = []
+    last_chart_data   = []
+
+    if last_batch and last_batch.batch_id:
+        batch_rows = Dataset.query.filter_by(
+            batch_id=last_batch.batch_id
+        ).order_by(Dataset.jam, Dataset.menit).all()
+
+        last_file_rows = len(batch_rows)
+        for br in batch_rows:
+            last_chart_labels.append(f'{br.jam:02d}:{br.menit:02d}')
+            last_chart_data.append(br.total_kendaraan)
+    else:
+        last_file_rows = 0
+
+    return {
+        'komposisi_per_hari' : komposisi_per_hari,
+        'avg_motor'          : a_motor,
+        'avg_mobil'          : a_mobil,
+        'avg_bus'            : a_bus,
+        'avg_truk'           : a_truk,
+        'avg_motor_pct'      : round(a_motor / total_avg * 100),
+        'avg_mobil_pct'      : round(a_mobil / total_avg * 100),
+        'avg_bus_pct'        : round(a_bus   / total_avg * 100),
+        'avg_truk_pct'       : round(a_truk  / total_avg * 100),
+        'last_file_name'     : last_file_name,
+        'last_file_rows'     : last_file_rows,
+        'last_chart_labels'  : last_chart_labels,
+        'last_chart_data'    : last_chart_data,
+    }
+
+
+# ──────────────────────────────────────────────────────────────
+#  HELPER — data untuk halaman Dashboard (dashboard.html)
+# ──────────────────────────────────────────────────────────────
+def get_dashboard_data(filter_day='', filter_kategori=''):
+    """Hitung semua agregasi dari DB untuk dashboard analitik.
+    filter_day      : nama hari (Senin, Selasa, ...) atau kosong = semua
+    filter_kategori : Rendah/Sedang/Tinggi atau kosong = semua
+    """
+    from collections import defaultdict
+
+    query = Dataset.query
+    if filter_day:
+        query = query.filter(Dataset.hari == filter_day)
+    if filter_kategori:
+        label = filter_kategori.capitalize()
+        query = query.filter(Dataset.tingkat_kepadatan == label)
+    rows = query.all()
+    if not rows:
+        jam_zero = [0]*8
+        return dict(
+            avg_per_jam=[0]*8, max_per_jam=[0]*8,
+            weekday_avg=jam_zero, weekend_avg=jam_zero,
+            motor_per_jam=jam_zero, mobil_per_jam=jam_zero,
+            bus_per_jam=jam_zero,   truk_per_jam=jam_zero,
+            heavy_pct=0, avg_bus=0, avg_truk=0, total_heavy=0,
+            heatmap_data={}, top_volume=[],
+        )
+
+    JAM_LIST = [6,7,8,15,16,17,18,19]
+    WEEKEND  = {'Sabtu', 'Minggu'}
+
+    # Kelompokkan per jam
+    by_jam      = defaultdict(list)
+    by_jam_wd   = defaultdict(list)  # weekday
+    by_jam_we   = defaultdict(list)  # weekend
+    by_jam_motor= defaultdict(list)
+    by_jam_mobil= defaultdict(list)
+    by_jam_bus  = defaultdict(list)
+    by_jam_truk = defaultdict(list)
+    by_hari_jam = defaultdict(list)  # untuk heatmap
+
+    for r in rows:
+        by_jam[r.jam].append(r.total_kendaraan)
+        by_jam_motor[r.jam].append(r.motor)
+        by_jam_mobil[r.jam].append(r.mobil)
+        by_jam_bus[r.jam].append(r.bus)
+        by_jam_truk[r.jam].append(r.truk)
+        if r.hari in WEEKEND:
+            by_jam_we[r.jam].append(r.total_kendaraan)
+        else:
+            by_jam_wd[r.jam].append(r.total_kendaraan)
+        key = f'{r.hari}_{r.jam:02d}'
+        by_hari_jam[key].append(r.total_kendaraan)
+
+    def avg(lst): return round(sum(lst)/len(lst), 1) if lst else 0
+    def mx(lst):  return max(lst) if lst else 0
+
+    avg_per_jam   = [avg(by_jam[j])       for j in JAM_LIST]
+    max_per_jam   = [mx(by_jam[j])        for j in JAM_LIST]
+    weekday_avg   = [avg(by_jam_wd[j])    for j in JAM_LIST]
+    weekend_avg   = [avg(by_jam_we[j])    for j in JAM_LIST]
+    motor_per_jam = [avg(by_jam_motor[j]) for j in JAM_LIST]
+    mobil_per_jam = [avg(by_jam_mobil[j]) for j in JAM_LIST]
+    bus_per_jam   = [avg(by_jam_bus[j])   for j in JAM_LIST]
+    truk_per_jam  = [avg(by_jam_truk[j])  for j in JAM_LIST]
+
+    # Kendaraan berat
+    all_bus   = sum(r.bus  for r in rows)
+    all_truk  = sum(r.truk for r in rows)
+    all_total = sum(r.total_kendaraan for r in rows) or 1
+    heavy_pct = round((all_bus + all_truk) / all_total * 100, 1)
+    total_heavy = all_bus + all_truk
+
+    # Heatmap: {'Senin_06': avg_total, ...}
+    heatmap_data = {}
+    HARI_LIST = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu']
+    for hari in HARI_LIST:
+        for jam in JAM_LIST:
+            key = f'{hari}_{jam:02d}'
+            vals = by_hari_jam.get(key, [])
+            heatmap_data[key] = round(avg(vals)) if vals else None
+
+    # Top 10 interval volume tertinggi
+    top_rows = sorted(rows, key=lambda r: r.total_kendaraan, reverse=True)[:10]
+    top_volume = [{
+        'hari'    : r.hari,
+        'jam'     : r.jam,
+        'menit'   : r.menit,
+        'motor'   : r.motor,
+        'mobil'   : r.mobil,
+        'bus'     : r.bus,
+        'truk'    : r.truk,
+        'total'   : r.total_kendaraan,
+        'kategori': (r.tingkat_kepadatan or '').lower(),
+    } for r in top_rows]
+
+    return dict(
+        avg_per_jam   = avg_per_jam,
+        max_per_jam   = max_per_jam,
+        weekday_avg   = weekday_avg,
+        weekend_avg   = weekend_avg,
+        motor_per_jam = motor_per_jam,
+        mobil_per_jam = mobil_per_jam,
+        bus_per_jam   = bus_per_jam,
+        truk_per_jam  = truk_per_jam,
+        heavy_pct     = heavy_pct,
+        avg_bus       = round(avg([r.bus  for r in rows]), 1),
+        avg_truk      = round(avg([r.truk for r in rows]), 1),
+        total_heavy   = f'{total_heavy:,}',
+        heatmap_data  = heatmap_data,
+        top_volume    = top_volume,
+    )
+
 # ============================================================
 # ROUTE — BERANDA  (public)
 # ============================================================
 @app.route('/')
 def index():
-    komposisi_per_hari = {
-        'senin':  [320,115,34,21], 'selasa':[298,108,30,18],
-        'rabu':   [310,112,32,20], 'kamis': [305,110,31,19],
-        'jumat':  [340,124,38,24], 'sabtu': [265, 95,26,15],
-        'minggu': [240, 88,22,12],
-    }
-    return render_template('index.html',
-        komposisi_per_hari=komposisi_per_hari, **get_stats())
+    stats  = get_stats()
+    idata  = get_index_data()
+    return render_template('index.html', **stats, **idata)
 
 # ============================================================
 # ROUTE — PREDIKSI  (public)
@@ -196,7 +407,16 @@ def prediksi():
 @app.route('/dashboard')
 @login_required_only
 def dashboard():
-    return render_template('dashboard.html', **get_stats())
+    # Ambil filter dari query string (?filter_day=Senin&filter_kategori=tinggi)
+    filter_day      = request.args.get('filter_day', '').strip()
+    filter_kategori = request.args.get('filter_kategori', '').strip()
+
+    stats = get_stats()
+    ddata = get_dashboard_data(filter_day=filter_day, filter_kategori=filter_kategori)
+    return render_template('dashboard.html',
+        filter_day      = filter_day,
+        filter_kategori = filter_kategori,
+        **stats, **ddata)
 
 # ============================================================
 # ROUTE — CLASSIFIER  (full_access)
@@ -579,15 +799,19 @@ def _do_retrain():
     split_ratio = float(request.form.get('split_ratio', 0.8))
     cv_fold     = int(request.form.get('cv_fold', 5))
 
-    # Ambil data dengan status_validasi = 'validated'
-    # (data yang sudah disetujui pakar Dishub — klik Setujui Terpilih → Simpan Terpilih)
-    rows = Dataset.query.filter_by(status_validasi='validated').all()
+    # Retrain menggunakan data yang sudah tervalidasi:
+    # - 'validated' : label disetujui pakar (tidak dikoreksi)
+    # - 'corrected' : label dikoreksi pakar
+    # Keduanya dipakai karena sudah dikonfirmasi oleh manusia
+    rows = Dataset.query.filter(
+        Dataset.status_validasi.in_(['validated', 'corrected'])
+    ).all()
 
-    print(f'[RETRAIN] Total data validated: {len(rows)} baris')
+    print(f'[RETRAIN] Total data validated+corrected: {len(rows)} baris')
 
     if len(rows) < 20:
         flash(
-            f'Data dengan status "validated" terlalu sedikit ({len(rows)} baris). '
+            f'Data tervalidasi (validated + corrected) terlalu sedikit ({len(rows)} baris). '
             f'Minimal 20 baris. Lakukan validasi data terlebih dahulu.',
             'danger'
         )

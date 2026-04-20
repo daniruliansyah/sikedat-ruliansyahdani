@@ -17,14 +17,14 @@
   <div class="stat-card fade-in delay-1">
     <span class="stat-icon">📊</span>
     <div class="stat-label">Total Data Tersimpan</div>
-    <div class="stat-value">{{ total_data | default('1,008') }}</div>
+    <div class="stat-value">{{ total_data }}</div>
     <div class="stat-meta">baris data tervalidasi</div>
   </div>
 
   <div class="stat-card cyan fade-in delay-2" style="padding-bottom: 16px;">
     <span class="stat-icon">🚗</span>
     <div class="stat-label">Total Kendaraan (Seluruh Data)</div>
-    <div class="stat-value">{{ total_kendaraan_all | default('63,504') }}</div>
+    <div class="stat-value">{{ total_kendaraan_all }}</div>
     <!-- Breakdown per jenis kendaraan -->
     <div style="
       display: grid;
@@ -37,25 +37,25 @@
       <div style="font-size:11.5px;color:var(--text-muted);">
         🏍️ Motor
         <span class="text-mono" style="color:var(--primary-light);margin-left:4px;">
-          {{ total_motor | default('41,895') }}
+          {{ total_motor }}
         </span>
       </div>
       <div style="font-size:11.5px;color:var(--text-muted);">
         🚗 Mobil
         <span class="text-mono" style="color:var(--cyan);margin-left:4px;">
-          {{ total_mobil | default('14,567') }}
+          {{ total_mobil }}
         </span>
       </div>
       <div style="font-size:11.5px;color:var(--text-muted);">
         🚌 Bus
         <span class="text-mono" style="color:var(--success);margin-left:4px;">
-          {{ total_bus | default('4,234') }}
+          {{ total_bus }}
         </span>
       </div>
       <div style="font-size:11.5px;color:var(--text-muted);">
         🚛 Truk
         <span class="text-mono" style="color:var(--warning);margin-left:4px;">
-          {{ total_truk | default('2,808') }}
+          {{ total_truk }}
         </span>
       </div>
     </div>
@@ -64,7 +64,7 @@
   <div class="stat-card warning fade-in delay-3">
     <span class="stat-icon">⏳</span>
     <div class="stat-label">Menunggu Validasi</div>
-    <div class="stat-value">{{ pending_validasi | default('0') }}</div>
+    <div class="stat-value">{{ pending_validasi }}</div>
     <div class="stat-meta">
       <a href="{{ url_for('validasi') }}" style="color:var(--warning);">Validasi sekarang →</a>
     </div>
@@ -85,9 +85,9 @@
         <div class="card-subtitle">
           File:
           <span class="text-mono" style="color:var(--cyan);">
-            {{ last_file_name | default('data_senin_pagi.csv') }}
+            {{ last_file_name }}
           </span>
-          · {{ last_file_rows | default(48) }} baris
+          · {{ last_file_rows }} baris
         </div>
       </div>
       <span class="badge badge-primary">Jl. Diponegoro</span>
@@ -158,11 +158,11 @@
       </div>
       <div style="flex:1;">
         {% for label, val, pct, color, bg in [
-          ('Rendah', count_rendah|default(302), pct_rendah|default(30),
+          ('Rendah', count_rendah, pct_rendah,
            'var(--label-rendah)', 'var(--label-rendah-bg)'),
-          ('Sedang', count_sedang|default(412), pct_sedang|default(41),
+          ('Sedang', count_sedang, pct_sedang,
            'var(--label-sedang)', 'var(--label-sedang-bg)'),
-          ('Tinggi', count_tinggi|default(294), pct_tinggi|default(29),
+          ('Tinggi', count_tinggi, pct_tinggi,
            'var(--label-tinggi)', 'var(--label-tinggi-bg)'),
         ] %}
         <div style="padding:10px 14px;background:{{ bg }};border-radius:var(--radius-md);
@@ -255,28 +255,9 @@
   Chart.defaults.font.family = "'DM Mono', monospace";
   Chart.defaults.font.size = 11;
 
-  /* ── Data dummy (diganti dari Flask saat data nyata tersedia) ── */
-  const chartLabels = {{ last_chart_labels | default([
-    '06:10','06:20','06:30','06:40','06:50',
-    '07:00','07:10','07:20','07:30','07:40','07:50',
-    '08:00','08:10','08:20','08:30','08:40','08:50',
-    '15:00','15:10','15:20','15:30','15:40','15:50',
-    '16:00','16:10','16:20','16:30','16:40','16:50',
-    '17:00','17:10','17:20','17:30','17:40','17:50',
-    '18:00','18:10','18:20','18:30','18:40','18:50',
-    '19:00','19:10','19:20','19:30','19:40','19:50'
-  ]) | tojson }};
-
-  const chartData = {{ last_chart_data | default([
-    32,38,44,52,65,
-    80,98,105,102,95,88,
-    78,70,62,55,48,42,
-    45,55,65,75,88,98,
-    105,110,102,95,88,78,
-    72,65,58,52,46,40,
-    35,30,28,26,24,22,
-    20,19,18,17,16,15
-  ]) | tojson }};
+  /* ── Data dari Flask (dari database tabel dataset) ── */
+  const chartLabels = {{ last_chart_labels | tojson }};
+  const chartData   = {{ last_chart_data   | tojson }};
 
   /* ── Chart Pola Kepadatan Terakhir (bar) ── */
   new Chart(document.getElementById('chartTerakhir').getContext('2d'), {
@@ -306,15 +287,16 @@
   });
 
   /* ── Komposisi per hari (data dummy per hari) ── */
+  /* Komposisi rata-rata per hari dari database */
   const komposisiData = {
-    semua:  {{ [avg_motor|default(2841), avg_mobil|default(987), avg_bus|default(287), avg_truk|default(172)] | tojson }},
-    senin:  {{ komposisi_per_hari.senin  | default([320, 115, 34, 21]) | tojson }},
-    selasa: {{ komposisi_per_hari.selasa | default([298, 108, 30, 18]) | tojson }},
-    rabu:   {{ komposisi_per_hari.rabu   | default([310, 112, 32, 20]) | tojson }},
-    kamis:  {{ komposisi_per_hari.kamis  | default([305, 110, 31, 19]) | tojson }},
-    jumat:  {{ komposisi_per_hari.jumat  | default([340, 124, 38, 24]) | tojson }},
-    sabtu:  {{ komposisi_per_hari.sabtu  | default([265,  95, 26, 15]) | tojson }},
-    minggu: {{ komposisi_per_hari.minggu | default([240,  88, 22, 12]) | tojson }},
+    semua:  {{ [avg_motor, avg_mobil, avg_bus, avg_truk] | tojson }},
+    senin:  {{ komposisi_per_hari.senin  | tojson }},
+    selasa: {{ komposisi_per_hari.selasa | tojson }},
+    rabu:   {{ komposisi_per_hari.rabu   | tojson }},
+    kamis:  {{ komposisi_per_hari.kamis  | tojson }},
+    jumat:  {{ komposisi_per_hari.jumat  | tojson }},
+    sabtu:  {{ komposisi_per_hari.sabtu  | tojson }},
+    minggu: {{ komposisi_per_hari.minggu | tojson }},
   };
 
   const icons  = ['🏍️','🚗','🚌','🚛'];
@@ -380,9 +362,9 @@
       labels: ['Rendah','Sedang','Tinggi'],
       datasets: [{
         data: [
-          {{ count_rendah|default(302) }},
-          {{ count_sedang|default(412) }},
-          {{ count_tinggi|default(294) }}
+          {{ count_rendah }},
+          {{ count_sedang }},
+          {{ count_tinggi }}
         ],
         backgroundColor: ['#10C981','#F59E0B','#EF4444'],
         borderWidth: 0, hoverOffset: 6
