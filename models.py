@@ -46,7 +46,7 @@ class User(UserMixin, db.Model):
     nama_lengkap = db.Column(db.String(150), nullable=True)
     role_id      = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     is_active    = db.Column(db.Boolean, default=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=datetime.now)
 
     # Relasi ke dataset (sebagai pengklasifikasi)
     dataset_diklasifikasi = db.relationship(
@@ -69,10 +69,10 @@ class User(UserMixin, db.Model):
         lazy=True
     )
 
-    # Helper: cek apakah user punya akses penuh
+    # Helper: cek apakah user adalah admin atau analis (role-based)
     @property
     def has_full_access(self):
-        return self.role.akses_penuh if self.role else False
+        return bool(self.role and self.role.nama in ['admin', 'analis'])
 
     def set_password(self, plain_password):
         self.password = bcrypt.generate_password_hash(plain_password).decode('utf-8')
@@ -140,7 +140,7 @@ class Dataset(db.Model):
     )
 
     # Timestamp
-    created_at        = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at        = db.Column(db.DateTime, default=datetime.now)
     validated_at      = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
@@ -158,7 +158,7 @@ class RetrainHistory(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     versi       = db.Column(db.String(20), nullable=False)      # cth: v1.0, v1.1
     algoritma   = db.Column(db.String(50), nullable=False)      # Random Forest / SVM
-    tanggal     = db.Column(db.DateTime,   default=datetime.utcnow)
+    tanggal     = db.Column(db.DateTime,   default=datetime.now)
     n_train     = db.Column(db.Integer,    nullable=True)       # jumlah data latih
     n_test      = db.Column(db.Integer,    nullable=True)       # jumlah data uji
     accuracy    = db.Column(db.Float,      nullable=True)       # 0.0–1.0
@@ -171,6 +171,9 @@ class RetrainHistory(db.Model):
     model_path  = db.Column(db.String(300), nullable=True)
     # Apakah ini model yang sedang aktif digunakan
     is_active   = db.Column(db.Boolean,    default=False)
+    # Durasi proses retrain dalam detik
+    duration_seconds = db.Column(db.Float, nullable=True)
+
     # Catatan / keterangan tambahan
     catatan     = db.Column(db.Text,       nullable=True)
 

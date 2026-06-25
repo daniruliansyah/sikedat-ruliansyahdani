@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Log Aktivitas{% endblock %}
+{% block page_title %}Log Aktivitas{% endblock %}
+{% block breadcrumb %}Log Aktivitas{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Log Aktivitas</h1>
+  <p>Riwayat aktivitas sistem — klasifikasi, validasi, dan retrain model.</p>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <div class="card-title">
+      <span class="dot" style="background:var(--warning);"></span>
+      {{ 'Aktivitas Hari Ini' if periode == 'hari_ini' else 'Semua Aktivitas' }}
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:12px;color:var(--text-muted);">{{ activities | length }} entri</span>
+      <div style="display:flex;background:var(--bg-elevated);border-radius:20px;padding:3px;gap:2px;">
+        <a href="{{ url_for('aktivitas', periode='hari_ini') }}"
+           style="padding:4px 12px;border-radius:16px;font-size:11.5px;text-decoration:none;
+                  {{ 'background:var(--primary);color:#fff;font-weight:600;' if periode == 'hari_ini' else 'color:var(--text-muted);' }}">
+          Hari Ini
+        </a>
+        <a href="{{ url_for('aktivitas', periode='semua') }}"
+           style="padding:4px 12px;border-radius:16px;font-size:11.5px;text-decoration:none;
+                  {{ 'background:var(--primary);color:#fff;font-weight:600;' if periode == 'semua' else 'color:var(--text-muted);' }}">
+          Semua
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if activities %}
+  <div style="display:flex;flex-direction:column;">
+    {% for act in activities %}
+    {% set icon, color = (
+      ('📂', 'var(--primary)')   if act.type == 'klasifikasi' else
+      ('✅', 'var(--success)')   if act.type == 'validasi' else
+      ('🔄', 'var(--cyan)')
+    ) %}
+    <div style="
+      display:flex;align-items:flex-start;gap:16px;
+      padding:14px 0;
+      border-bottom:1px solid var(--border);
+    ">
+      <!-- Icon -->
+      <div style="
+        width:36px;height:36px;border-radius:50%;flex-shrink:0;
+        background:var(--bg-elevated);
+        display:flex;align-items:center;justify-content:center;
+        font-size:16px;margin-top:2px;
+      ">{{ icon }}</div>
+
+      <!-- Konten -->
+      <div style="flex:1;min-width:0;">
+        <div class="flex items-center justify-between" style="margin-bottom:3px;">
+          <span style="font-size:13px;font-weight:700;color:var(--text-heading);">
+            {{ act.title }}
+          </span>
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px;">
+            {{ act.waktu.strftime('%d %b %Y, %H:%M') if act.waktu else '—' }}
+          </span>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:4px;">
+          {{ act.desc }}
+        </div>
+        <div style="font-size:11.5px;color:var(--text-muted);">
+          Oleh:
+          <span style="color:{{ color }};font-weight:600;">{{ act.oleh }}</span>
+        </div>
+      </div>
+
+      <!-- Badge tipe -->
+      <div style="flex-shrink:0;padding-top:2px;">
+        <span class="badge badge-{{
+          'primary' if act.type == 'klasifikasi' else
+          'success' if act.type == 'validasi' else
+          'info'
+        }}" style="font-size:10.5px;">
+          {{ act.type | capitalize }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+    <div style="font-size:40px;margin-bottom:12px;opacity:0.2;">📋</div>
+    {% if periode == 'hari_ini' %}
+    <div style="font-size:14px;">Belum ada aktivitas hari ini.</div>
+    <div style="font-size:12px;margin-top:6px;">
+      Coba tampilkan
+      <a href="{{ url_for('aktivitas', periode='semua') }}"
+         style="color:var(--primary);">semua aktivitas</a>
+      untuk melihat riwayat sebelumnya.
+    </div>
+    {% else %}
+    <div style="font-size:14px;">Belum ada aktivitas tercatat.</div>
+    <div style="font-size:12px;margin-top:6px;">
+      Aktivitas akan muncul setelah ada klasifikasi, validasi, atau retrain.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

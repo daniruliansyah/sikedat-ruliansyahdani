@@ -7,15 +7,17 @@ Helper functions untuk:
 - Prediksi single input (dari halaman prediksi)
 """
 
-import os
-import json
+import os, json
 import joblib
 import numpy as np
 import pandas as pd
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 
-FITUR = ['hari_enc', 'jam', 'menit', 'motor', 'mobil', 'bus', 'truk', 'total_kendaraan']
+HARI_COLS = ['Hari_Jumat', 'Hari_Kamis', 'Hari_Minggu', 'Hari_Rabu',
+             'Hari_Sabtu', 'Hari_Selasa', 'Hari_Senin']
+
+FITUR = ['Jam', 'Menit'] + HARI_COLS + ['Motor', 'Mobil', 'Bus', 'Truk', 'Total_Kendaraan']
 
 
 def _load(filename):
@@ -23,23 +25,13 @@ def _load(filename):
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"File {path} tidak ditemukan. "
-            "Jalankan train_models.py terlebih dahulu."
+            "Jalankan train_initial_model.py terlebih dahulu."
         )
     return joblib.load(path)
 
 
 def load_model():
     return _load('model_aktif.pkl')
-
-
-def load_scaler():
-    return _load('scaler.pkl')
-
-
-def load_encoders():
-    le_hari  = _load('le_hari.pkl')
-    le_label = _load('le_label.pkl')
-    return le_hari, le_label
 
 
 def load_metadata():
@@ -50,53 +42,54 @@ def load_metadata():
         return json.load(f)
 
 
+def _ohe_hari(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    hari_series = df['hari'].str.strip().str.title()
+    for col in HARI_COLS:
+        nama_hari = col.replace('Hari_', '')
+        df[col] = (hari_series == nama_hari).astype(int)
+    return df
+
+
 # ============================================================
 # KLASIFIKASI BATCH — dari DataFrame CSV yang diupload user
 # ============================================================
 def classify_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Menerima DataFrame hasil upload CSV (tanpa kolom tingkat_kepadatan),
+    Menerima DataFrame hasil upload CSV (kolom lowercase),
     mengembalikan DataFrame yang sama ditambah kolom:
     - tingkat_kepadatan  : prediksi label
     - confidence         : probabilitas kelas yang diprediksi (%)
     - proba_rendah/sedang/tinggi : probabilitas per kelas
-
-    Raises ValueError jika kolom yang dibutuhkan tidak lengkap.
     """
     KOLOM_WAJIB = ['hari', 'jam', 'menit', 'motor', 'mobil', 'bus', 'truk', 'total_kendaraan']
     missing = [c for c in KOLOM_WAJIB if c not in df.columns]
     if missing:
         raise ValueError(f"Kolom tidak lengkap: {missing}")
 
-    model    = load_model()
-    scaler   = load_scaler()
-    le_hari, le_label = load_encoders()
+    model = load_model()
+    df    = _ohe_hari(df)
 
-    df = df.copy()
+    # Rename kolom numerik ke Title case agar sesuai urutan FITUR
+    rename_map = {
+        'jam': 'Jam', 'menit': 'Menit',
+        'motor': 'Motor', 'mobil': 'Mobil',
+        'bus': 'Bus', 'truk': 'Truk',
+        'total_kendaraan': 'Total_Kendaraan',
+    }
+    df_feat = df.rename(columns=rename_map)
 
-    # Handle hari yang tidak dikenal dengan transform aman
-    known_hari = list(le_hari.classes_)
-    df['hari_clean'] = df['hari'].apply(
-        lambda h: h if h in known_hari else known_hari[0]
-    )
-    df['hari_enc'] = le_hari.transform(df['hari_clean'])
+    X       = df_feat[FITUR].values
+    y_pred  = model.predict(X)
+    y_proba = model.predict_proba(X)
 
-    X = df[FITUR].values
-    X_scaled = scaler.transform(X)
+    classes = list(model.classes_)  # ['Rendah', 'Sedang', 'Tinggi']
 
-    y_pred  = model.predict(X_scaled)
-    y_proba = model.predict_proba(X_scaled)  # shape (n, 3)
-
-    classes = list(le_label.classes_)  # ['Rendah', 'Sedang', 'Tinggi']
-
-    df['tingkat_kepadatan'] = le_label.inverse_transform(y_pred)
+    df['tingkat_kepadatan'] = y_pred
     df['confidence']        = (np.max(y_proba, axis=1) * 100).round(1)
 
     for i, cls in enumerate(classes):
         df[f'proba_{cls.lower()}'] = (y_proba[:, i] * 100).round(1)
-
-    # Buang kolom helper
-    df.drop(columns=['hari_clean', 'hari_enc'], errors='ignore', inplace=True)
 
     return df
 
@@ -108,42 +101,35 @@ def predict_single(hari: str, jam: int, menit: int) -> dict:
     """
     Prediksi kepadatan berdasarkan hari, jam, menit saja.
     Nilai motor/mobil/bus/truk diestimasi dari rata-rata historis
-    (karena user tidak menginput volume kendaraan di halaman prediksi publik).
-
-    Returns dict:
-    {
-        'label'     : 'Sedang',
-        'confidence': 78.5,
-        'proba'     : {'Rendah': 12.0, 'Sedang': 78.5, 'Tinggi': 9.5}
-    }
+    data real (dataset_real_berlabel.csv, 877 baris).
     """
-    # Nilai rata-rata historis per jam (estimasi kasar)
     avg_per_jam = {
-        6:  {'motor':28, 'mobil':9,  'bus':3, 'truk':2},
-        7:  {'motor':72, 'mobil':22, 'bus':6, 'truk':4},
-        8:  {'motor':48, 'mobil':15, 'bus':4, 'truk':3},
-        15: {'motor':38, 'mobil':12, 'bus':4, 'truk':3},
-        16: {'motor':55, 'mobil':17, 'bus':5, 'truk':3},
-        17: {'motor':78, 'mobil':24, 'bus':7, 'truk':4},
-        18: {'motor':52, 'mobil':16, 'bus':5, 'truk':3},
-        19: {'motor':32, 'mobil':10, 'bus':3, 'truk':2},
+        6:  {'motor': 369, 'mobil': 81,  'bus': 5, 'truk': 1},
+        7:  {'motor': 434, 'mobil': 109, 'bus': 7, 'truk': 1},
+        8:  {'motor': 471, 'mobil': 140, 'bus': 7, 'truk': 2},
+        15: {'motor': 487, 'mobil': 229, 'bus': 8, 'truk': 4},
+        16: {'motor': 462, 'mobil': 214, 'bus': 5, 'truk': 2},
+        17: {'motor': 173, 'mobil': 180, 'bus': 3, 'truk': 1},
+        18: {'motor': 21,  'mobil': 85,  'bus': 1, 'truk': 0},
+        19: {'motor': 23,  'mobil': 97,  'bus': 1, 'truk': 0},
     }
 
-    avg = avg_per_jam.get(int(jam), {'motor':40, 'mobil':12, 'bus':4, 'truk':3})
+    avg   = avg_per_jam.get(int(jam), {'motor': 302, 'mobil': 141, 'bus': 5, 'truk': 2})
     total = avg['motor'] + avg['mobil'] + avg['bus'] + avg['truk']
 
     df_single = pd.DataFrame([{
         'hari': hari, 'jam': int(jam), 'menit': int(menit),
         'motor': avg['motor'], 'mobil': avg['mobil'],
         'bus': avg['bus'],     'truk': avg['truk'],
-        'total_kendaraan': total
+        'total_kendaraan': total,
     }])
 
-    result = classify_dataframe(df_single)
-    row    = result.iloc[0]
-    label_classes = list(load_encoders()[1].classes_)
+    result  = classify_dataframe(df_single)
+    row     = result.iloc[0]
+    model   = load_model()
+    classes = list(model.classes_)
 
-    proba = {cls: float(row[f'proba_{cls.lower()}']) for cls in label_classes}
+    proba = {cls: float(row.get(f'proba_{cls.lower()}', 0.0)) / 100 for cls in classes}
 
     return {
         'label'     : row['tingkat_kepadatan'],

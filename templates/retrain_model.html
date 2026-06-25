@@ -119,16 +119,6 @@
 
     <div style="padding:14px;background:var(--bg-elevated);border-radius:var(--radius-md);">
       <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">
-        Penambahan Data Baru
-      </div>
-      <div style="font-family:var(--font-mono);font-size:24px;color:var(--warning);">
-        {{ n_new_data | default('—') }}
-        <span style="font-size:13px;color:var(--text-muted);">baris baru</span>
-      </div>
-    </div>
-
-    <div style="padding:14px;background:var(--bg-elevated);border-radius:var(--radius-md);">
-      <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">
         Total Dataset Keseluruhan
       </div>
       <div style="font-family:var(--font-mono);font-size:24px;color:var(--primary-light);">
@@ -164,7 +154,7 @@
       <div>
         <div style="font-size:13.5px;font-weight:700;color:var(--text-heading);">
           Algoritma:
-          {% if model_info is defined %}{{ model_info.algoritma }}{% else %}Model Terbaik{% endif %}
+          {% if model_info is defined and model_info.algoritma != '—' %}{{ model_info.algoritma }}{% else %}Random Forest{% endif %}
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
           Tidak dapat diubah — menggunakan algoritma yang menghasilkan akurasi terbaik
@@ -174,28 +164,33 @@
       <span class="badge badge-primary" style="margin-left:auto;">Terkunci 🔒</span>
     </div>
 
-    <div class="grid grid-2" style="gap:20px;margin-bottom:20px;">
-
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Rasio Split Data</label>
-        <select class="form-control" name="split_ratio">
-          <option value="0.8" selected>80% Train / 20% Test</option>
-          <option value="0.75">75% Train / 25% Test</option>
-          <option value="0.7">70% Train / 30% Test</option>
-        </select>
-        <div class="form-hint">Pembagian data latih dan uji (stratified split)</div>
+    <!-- Info hyperparameter RF S1 -->
+    <div style="
+      padding:14px 18px;background:var(--bg-elevated);
+      border-radius:var(--radius-md);margin-bottom:20px;
+    ">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">
+        Hyperparameter Random Forest (Best Skenario)
       </div>
-
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Cross-Validation Fold</label>
-        <select class="form-control" name="cv_fold">
-          <option value="5" selected>5-Fold CV</option>
-          <option value="3">3-Fold CV</option>
-          <option value="10">10-Fold CV</option>
-        </select>
-        <div class="form-hint">Jumlah fold untuk cross-validation training</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        {% set params = [
+          ('n_estimators', '200'),
+          ('max_depth', '10'),
+          ('min_samples_split', '2'),
+          ('min_samples_leaf', '1'),
+          ('class_weight', 'balanced'),
+          ('random_state', '42'),
+        ] %}
+        {% for k, v in params %}
+        <div style="
+          padding:5px 12px;border-radius:20px;
+          background:var(--bg-card);border:1px solid var(--border);
+          font-family:var(--font-mono);font-size:12px;color:var(--text-heading);
+        ">
+          <span style="color:var(--text-muted);">{{ k }}</span>=<span style="color:var(--primary-light);">{{ v }}</span>
+        </div>
+        {% endfor %}
       </div>
-
     </div>
 
     <!-- Submit -->
@@ -208,11 +203,6 @@
         </svg>
         Mulai Retrain Model
       </button>
-      <div style="font-size:12px;color:var(--text-muted);">
-        Estimasi waktu:
-        <span style="color:var(--warning);">2–5 menit</span>
-        tergantung jumlah data
-      </div>
     </div>
 
   </form>
@@ -280,6 +270,7 @@
           <th>Data Latih</th>
           <th>Akurasi</th>
           <th>F1-Score</th>
+          <th>Durasi</th>
           <th>Status</th>
           <th>Aksi</th>
         </tr>
@@ -291,17 +282,24 @@
           <tr>
             <td class="td-mono">{{ h.versi }}</td>
             <td>{{ h.algoritma }}</td>
-            <td>{{ h.tanggal }}</td>
-            <td class="td-mono">{{ h.n_train }}</td>
-            <td class="td-mono" style="color:var(--success);">{{ h.accuracy }}</td>
-            <td class="td-mono" style="color:var(--success);">{{ h.f1 }}</td>
+            <td>{{ h.tanggal.strftime('%d %b %Y, %H:%M') if h.tanggal else '—' }}</td>
+            <td class="td-mono">{{ '{:,}'.format(h.n_train) if h.n_train else '—' }}</td>
+            <td class="td-mono" style="color:var(--success);">
+              {{ '%.2f%%' | format(h.accuracy * 100) if h.accuracy else '—' }}
+            </td>
+            <td class="td-mono" style="color:var(--success);">
+              {{ '%.2f%%' | format(h.f1_score * 100) if h.f1_score else '—' }}
+            </td>
+            <td class="td-mono" style="color:var(--text-muted);">
+              {{ '%.1f dtk' | format(h.duration_seconds) if h.duration_seconds else '—' }}
+            </td>
             <td>
-              <span class="badge badge-{{ 'success' if h.active else 'info' }}">
-                {{ 'Aktif ✓' if h.active else 'Arsip' }}
+              <span class="badge badge-{{ 'success' if h.is_active else 'info' }}">
+                {{ 'Aktif ✓' if h.is_active else 'Arsip' }}
               </span>
             </td>
             <td>
-              {% if not h.active %}
+              {% if not h.is_active %}
               <button class="btn btn-ghost btn-sm"
                       onclick="activateModel('{{ h.versi }}')">
                 Aktifkan
@@ -314,7 +312,7 @@
           {% endfor %}
         {% else %}
         <tr>
-          <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+          <td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted);">
             <div style="font-size:32px;margin-bottom:8px;opacity:0.2;">🔄</div>
             Belum ada riwayat retrain.<br>
             <small>Jalankan retrain pertama kali menggunakan form di atas.</small>

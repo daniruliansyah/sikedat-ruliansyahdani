@@ -1,47 +1,45 @@
 {
   "best_algo": "Random Forest",
+  "model_type": "Random Forest",
+  "scenario": "S1",
+  "n_train": 702,
+  "n_test": 176,
+  "n_total": 878,
+  "features": [
+    "Jam",
+    "Menit",
+    "Hari_Jumat",
+    "Hari_Kamis",
+    "Hari_Minggu",
+    "Hari_Rabu",
+    "Hari_Sabtu",
+    "Hari_Selasa",
+    "Hari_Senin",
+    "Motor",
+    "Mobil",
+    "Bus",
+    "Truk",
+    "Total_Kendaraan"
+  ],
+  "params": {
+    "n_estimators": 200,
+    "max_depth": 10,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "class_weight": "balanced",
+    "random_state": 42
+  },
   "rf": {
-    "accuracy": 1.0,
-    "precision": 1.0,
-    "recall": 1.0,
-    "f1_score": 1.0,
-    "cv_score": 1.0,
-    "params": {
-      "max_depth": "10",
-      "min_samples_leaf": "1",
-      "min_samples_split": "5",
-      "n_estimators": "100"
-    }
+    "accuracy": 0.733,
+    "precision": 0.7302,
+    "recall": 0.733,
+    "f1_score": 0.7284,
+    "cv_f1": 0.7301
   },
-  "svm": {
-    "accuracy": 0.955556,
-    "precision": 0.955936,
-    "recall": 0.955556,
-    "f1_score": 0.955535,
-    "cv_score": 0.949364,
-    "params": {
-      "C": "10",
-      "gamma": "auto",
-      "kernel": "rbf"
-    }
-  },
-  "n_train": 537,
-  "n_test": 135,
-  "total_data": 672,
   "label_classes": [
     "Rendah",
     "Sedang",
     "Tinggi"
   ],
-  "fitur": [
-    "hari_enc",
-    "jam",
-    "menit",
-    "motor",
-    "mobil",
-    "bus",
-    "truk",
-    "total_kendaraan"
-  ],
-  "tanggal": "2026-04-15 16:13:00"
+  "trained_at": "2026-06-22T07:27:40.517490"
 }
