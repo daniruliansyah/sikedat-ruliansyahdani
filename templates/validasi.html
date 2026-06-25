@@ -51,13 +51,16 @@
           {% else %}
           <span class="badge badge-info">⏳ Menunggu</span>
           {% endif %}
-          <span style="font-size:12px;color:var(--text-muted);">
+          <span style="font-size:12px;
+                       color:{{ 'var(--text-heading)' if b.is_current else 'var(--text-muted)' }};
+                       font-weight:{{ '600' if b.is_current else 'normal' }};">
             {{ b.nama_file or 'Tanpa nama' }}
           </span>
         </div>
-        <div style="font-size:12px;color:var(--text-muted);">
+        <div style="font-size:12px;color:{{ 'var(--text-secondary)' if b.is_current else 'var(--text-muted)' }};">
           {{ b.jumlah }} baris ·
           Dikirim: {{ b.dibuat.strftime('%d %b %Y %H:%M') if b.dibuat else '—' }} ·
+          Oleh: <strong>{{ b.classified_by_nama }}</strong> ·
           Batch ID: <span class="text-mono" style="font-size:11px;">{{ b.batch_id[:12] }}...</span>
         </div>
       </div>
@@ -196,6 +199,7 @@
             <th>Prediksi Model</th>
             <th>Label Validasi</th>
             <th>Status</th>
+            <th style="width:72px;">Aksi</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -244,12 +248,20 @@
                   {{ '✅ Valid' if row.status_validasi=='validated' else ('✏️ Dikoreksi' if row.status_validasi=='corrected' else '⏳ Pending') }}
                 </span>
               </td>
+              <td>
+                <button class="btn btn-success btn-sm"
+                        id="btnValid-{{ row.id }}"
+                        onclick="approveRow('{{ row.id }}')"
+                        style="font-size:11px;padding:3px 8px;white-space:nowrap;">
+                  ✓ Valid
+                </button>
+              </td>
             </tr>
             {% endfor %}
           {% else %}
           <!-- Empty state: tidak ada data untuk divalidasi -->
           <tr>
-            <td colspan="14" style="text-align:center;padding:56px 20px;">
+            <td colspan="15" style="text-align:center;padding:56px 20px;">
               <div style="font-size:48px;margin-bottom:14px;opacity:0.2;">&#10003;</div>
               <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">
                 Tidak Ada Data untuk Divalidasi
@@ -448,22 +460,33 @@ function onLabelChange(sel) {
   var ori = sel.getAttribute('data-original');
   var val = sel.value;
   var bdg = document.getElementById('statusBadge-' + id);
+  var btn = document.getElementById('btnValid-' + id);
 
-  /* Jika sudah di-approve tapi label diubah lagi, batalkan approval */
-  if (approvedSet.has(id)) {
+  if (val !== ori) {
+    /* Label dikoreksi: otomatis masuk approvedSet */
+    approvedSet.add(id);
+    if (bdg) { bdg.className = 'badge badge-warning'; bdg.textContent = '✏️ Dikoreksi'; }
+    if (btn) btn.disabled = true;
+  } else {
+    /* Dikembalikan ke original: batalkan approval */
     approvedSet.delete(id);
+    if (bdg) { bdg.className = 'badge badge-info'; bdg.textContent = '⏳ Pending'; }
+    if (btn) btn.disabled = false;
   }
 
-  if (bdg) {
-    if (val !== ori) {
-      bdg.className   = 'badge badge-warning';
-      bdg.textContent = 'Dikoreksi';
-    } else {
-      bdg.className   = 'badge badge-info';
-      bdg.textContent = 'Pending';
-    }
-  }
+  syncUI();
+}
 
+/* ================================================
+   4a. APPROVE SATU BARIS - dari tombol ✓ Valid per baris
+   ================================================ */
+function approveRow(id) {
+  var sid = String(id);
+  approvedSet.add(sid);
+  var bdg = document.getElementById('statusBadge-' + sid);
+  var btn = document.getElementById('btnValid-' + sid);
+  if (bdg) { bdg.className = 'badge badge-success'; bdg.textContent = '✅ Valid'; }
+  if (btn) btn.disabled = true;
   syncUI();
 }
 
@@ -479,11 +502,10 @@ function bulkSetujui() {
   checked.forEach(function(cb) {
     var id  = cb.getAttribute('data-id');
     var bdg = document.getElementById('statusBadge-' + id);
+    var btn = document.getElementById('btnValid-' + id);
     approvedSet.add(id);
-    if (bdg) {
-      bdg.className   = 'badge badge-success';
-      bdg.textContent = 'Valid';
-    }
+    if (bdg) { bdg.className = 'badge badge-success'; bdg.textContent = '✅ Valid'; }
+    if (btn) btn.disabled = true;
   });
   syncUI();
 }
@@ -519,7 +541,7 @@ function bulkSetLabel(label) {
    ================================================ */
 function submitValidasi() {
   if (approvedSet.size === 0) {
-    alert('Belum ada baris yang disetujui. Klik "Setujui Terpilih" dahulu.');
+    alert('Belum ada baris yang disetujui. Klik "✓ Valid" pada baris, ubah label, atau gunakan "Setujui Terpilih".');
     return;
   }
 

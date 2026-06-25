@@ -45,7 +45,7 @@ def full_access_required(f):
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
-        if not current_user.has_full_access:
+        if not (current_user.role and current_user.role.nama in ['admin', 'analis']):
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -109,7 +109,7 @@ def not_found(e):      return render_template('404.html'), 404
 # ============================================================
 @app.context_processor
 def inject_globals():
-    return {'now': datetime.utcnow()}
+    return {'now': datetime.now()}
 
 # ──────────────────────────────────────────────────────────────
 #  HELPER — statistik dasar dari tabel dataset
@@ -438,6 +438,7 @@ def classifier():
         # Baca CSV
         try:
             df = pd.read_csv(file)
+            df.columns = df.columns.str.lower()
         except Exception as e:
             flash(f'Gagal membaca file CSV: {str(e)}', 'danger')
             return render_template('classifier.html', step=1)
@@ -578,18 +579,24 @@ def validasi():
         Dataset.batch_id,
         func.count(Dataset.id).label('jumlah'),
         func.min(Dataset.created_at).label('dibuat'),
-        func.min(Dataset.nama_file).label('nama_file')
+        func.min(Dataset.nama_file).label('nama_file'),
+        func.min(Dataset.classified_by).label('classified_by_id')
     ).filter(
         Dataset.status_validasi == 'pending',
         Dataset.batch_id.isnot(None)
     ).group_by(Dataset.batch_id).order_by('dibuat').all()
 
+    # Lookup nama user yang mengklasifikasi (satu query untuk semua batch)
+    cb_ids   = [b.classified_by_id for b in semua_batch_pending if b.classified_by_id]
+    user_map = {u.id: u.nama_lengkap for u in User.query.filter(User.id.in_(cb_ids)).all()} if cb_ids else {}
+
     antrian_info = [{
-        'batch_id'  : b.batch_id,
-        'jumlah'    : b.jumlah,
-        'dibuat'    : b.dibuat,
-        'nama_file' : b.nama_file,
-        'is_current': b.batch_id == current_batch_id,
+        'batch_id'           : b.batch_id,
+        'jumlah'             : b.jumlah,
+        'dibuat'             : b.dibuat,
+        'nama_file'          : b.nama_file,
+        'is_current'         : b.batch_id == current_batch_id,
+        'classified_by_nama' : user_map.get(b.classified_by_id, '—'),
     } for b in semua_batch_pending]
 
     # Statistik
@@ -661,7 +668,7 @@ def save_validated():
         # → agar saat retrain, semua data konsisten pakai kolom tingkat_kepadatan
         row.tingkat_kepadatan = new_label
         row.validated_by      = current_user.id
-        row.validated_at      = datetime.utcnow()
+        row.validated_at      = datetime.now()
         updated += 1
 
     db.session.commit()
@@ -795,9 +802,9 @@ def retrain_model():
 
 def _do_retrain():
     """Jalankan retrain model dari dataset yang sudah tervalidasi di DB."""
-    import subprocess, sys
-    split_ratio = float(request.form.get('split_ratio', 0.8))
-    cv_fold     = int(request.form.get('cv_fold', 5))
+    import subprocess, sys, time
+    split_ratio = 0.8  # fixed sesuai train_models.py
+    cv_fold     = 5    # fixed sesuai train_models.py
 
     # Retrain menggunakan data yang sudah tervalidasi:
     # - 'validated' : label disetujui pakar (tidak dikoreksi)
@@ -830,14 +837,16 @@ def _do_retrain():
         'tingkat_kepadatan': r.tingkat_kepadatan,  # ← pakai ini, bukan label_final
     } for r in rows])
 
-    tmp_csv = os.path.join(BASE_DIR, 'dataset_dummy_berlabel.csv')
+    tmp_csv = os.path.join(BASE_DIR, 'dataset_tervalidasi.csv')
     df.to_csv(tmp_csv, index=False)
 
     # Jalankan training
+    t_start = time.time()
     result = subprocess.run(
         [sys.executable, 'train_models.py'],
         capture_output=True, text=True, cwd=BASE_DIR
     )
+    duration_seconds = round(time.time() - t_start, 1)
 
     if result.returncode != 0:
         flash(f'Retrain gagal: {result.stderr[:300]}', 'danger')
@@ -860,31 +869,167 @@ def _do_retrain():
 
     # Non-aktifkan semua, tambah record baru
     RetrainHistory.query.update({'is_active': False})
-    chosen = meta.get(algo.lower().replace(' ','_'), meta.get('rf', {}))
-    if algo == 'Random Forest': chosen = meta.get('rf', {})
-    elif algo == 'SVM':         chosen = meta.get('svm', {})
+    chosen = meta.get('rf', {})
 
     record = RetrainHistory(
-        versi       = new_ver,
-        algoritma   = algo,
-        n_train     = meta.get('n_train'),
-        n_test      = meta.get('n_test'),
-        accuracy    = chosen.get('accuracy'),
-        precision   = chosen.get('precision'),
-        recall      = chosen.get('recall'),
-        f1_score    = chosen.get('f1_score'),
-        split_ratio = split_ratio,
-        cv_fold     = cv_fold,
-        model_path  = 'models/model_aktif.pkl',
-        is_active   = True,
-        user_id     = current_user.id,
-        catatan     = f'Retrain dari {len(rows)} data tervalidasi.',
+        versi            = new_ver,
+        algoritma        = algo,
+        n_train          = meta.get('n_train'),
+        n_test           = meta.get('n_test'),
+        accuracy         = chosen.get('accuracy'),
+        precision        = chosen.get('precision'),
+        recall           = chosen.get('recall'),
+        f1_score         = chosen.get('f1_score'),
+        split_ratio      = split_ratio,
+        cv_fold          = cv_fold,
+        duration_seconds = duration_seconds,
+        model_path       = 'models/model_aktif.pkl',
+        is_active        = True,
+        user_id          = current_user.id,
+        catatan          = f'Retrain dari {len(rows)} data tervalidasi.',
     )
     db.session.add(record)
     db.session.commit()
 
-    flash(f'Retrain berhasil! Model {new_ver} ({algo}) — Akurasi: {chosen.get("accuracy",0)*100:.2f}%', 'success')
+    flash(f'Retrain berhasil! Model {new_ver} ({algo}) — Akurasi: {chosen.get("accuracy",0)*100:.2f}% — Selesai dalam {duration_seconds} detik', 'success')
     return redirect(url_for('retrain_model'))
+
+
+@app.route('/aktivitas')
+@full_access_required
+def aktivitas():
+    from sqlalchemy import func
+    from datetime import date
+
+    periode = request.args.get('periode', 'hari_ini')
+    today   = date.today()
+
+    # ── Klasifikasi: ambil tiap batch, urutkan terbaru ──
+    klas_q = db.session.query(
+        Dataset.batch_id,
+        Dataset.nama_file,
+        func.count(Dataset.id).label('jumlah'),
+        func.min(Dataset.created_at).label('waktu'),
+        func.min(Dataset.classified_by).label('user_id'),
+    ).filter(Dataset.batch_id.isnot(None))
+    if periode == 'hari_ini':
+        klas_q = klas_q.filter(func.date(Dataset.created_at) == today)
+    batches = klas_q.group_by(Dataset.batch_id).order_by(db.desc('waktu')).limit(20).all()
+
+    # ── Validasi: satu entri per aksi simpan (group by user + batch + menit) ──
+    val_q = db.session.query(
+        Dataset.validated_by,
+        Dataset.batch_id,
+        func.min(Dataset.nama_file).label('nama_file'),
+        func.strftime('%Y-%m-%d %H:%M', Dataset.validated_at).label('menit_val'),
+        func.count(Dataset.id).label('jumlah'),
+        func.sum(db.case((Dataset.status_validasi == 'corrected', 1), else_=0)).label('dikoreksi'),
+        func.max(Dataset.validated_at).label('waktu'),
+    ).filter(Dataset.validated_at.isnot(None))
+    if periode == 'hari_ini':
+        val_q = val_q.filter(func.date(Dataset.validated_at) == today)
+    validasi_rows = val_q.group_by(
+        Dataset.validated_by,
+        Dataset.batch_id,
+        func.strftime('%Y-%m-%d %H:%M', Dataset.validated_at)
+    ).order_by(db.desc('waktu')).limit(20).all()
+
+    # ── Retrain: dari RetrainHistory ──
+    ret_q = RetrainHistory.query
+    if periode == 'hari_ini':
+        ret_q = ret_q.filter(func.date(RetrainHistory.tanggal) == today)
+    retrains = ret_q.order_by(RetrainHistory.tanggal.desc()).limit(10).all()
+
+    # ── Lookup semua user_id yang muncul ──
+    all_ids = set()
+    for b in batches:
+        if b.user_id: all_ids.add(b.user_id)
+    for v in validasi_rows:
+        if v.validated_by: all_ids.add(v.validated_by)
+    for r in retrains:
+        if r.user_id: all_ids.add(r.user_id)
+    user_map = {u.id: u.nama_lengkap for u in User.query.filter(User.id.in_(all_ids)).all()} if all_ids else {}
+
+    # ── Gabungkan jadi satu list aktivitas, urutkan by waktu ──
+    activities = []
+
+    for b in batches:
+        activities.append({
+            'type'  : 'klasifikasi',
+            'title' : 'Klasifikasi selesai',
+            'desc'  : f'{b.nama_file} · {b.jumlah} baris diproses',
+            'oleh'  : user_map.get(b.user_id, '—'),
+            'waktu' : b.waktu,
+        })
+
+    for v in validasi_rows:
+        koreksi_info = f' · {v.dikoreksi} label dikoreksi' if v.dikoreksi else ''
+        file_info    = f' · {v.nama_file}' if v.nama_file else ''
+        activities.append({
+            'type'  : 'validasi',
+            'title' : 'Validasi data',
+            'desc'  : f'{v.jumlah} baris divalidasi{koreksi_info}{file_info}',
+            'oleh'  : user_map.get(v.validated_by, '—'),
+            'waktu' : v.waktu,
+        })
+
+    for r in retrains:
+        dur = f' · {r.duration_seconds:.1f} dtk' if r.duration_seconds else ''
+        acc = f' · Akurasi {r.accuracy*100:.2f}%' if r.accuracy else ''
+        activities.append({
+            'type'  : 'retrain',
+            'title' : f'Retrain model ({r.versi})',
+            'desc'  : f'{r.algoritma} · {r.n_train} data latih{acc}{dur}',
+            'oleh'  : user_map.get(r.user_id, '—'),
+            'waktu' : r.tanggal,
+        })
+
+    activities.sort(key=lambda x: x['waktu'] or datetime.min, reverse=True)
+
+    return render_template('aktivitas.html', activities=activities, periode=periode)
+
+
+# ============================================================
+# ROUTE — DATA OBSERVASI  (login semua role)
+# ============================================================
+@app.route('/data-observasi')
+@login_required_only
+def data_observasi():
+    status = request.args.get('status', 'semua')
+    page   = request.args.get('page', 1, type=int)
+
+    query = Dataset.query
+    if status == 'pending':
+        query = query.filter(Dataset.status_validasi == 'pending')
+    elif status == 'tervalidasi':
+        query = query.filter(Dataset.status_validasi.in_(['validated', 'corrected']))
+
+    pagination = query.order_by(Dataset.created_at.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
+
+    count_all         = Dataset.query.count()
+    count_pending     = Dataset.query.filter(Dataset.status_validasi == 'pending').count()
+    count_tervalidasi = Dataset.query.filter(
+        Dataset.status_validasi.in_(['validated', 'corrected'])
+    ).count()
+
+    all_ids = set()
+    for row in pagination.items:
+        if row.classified_by: all_ids.add(row.classified_by)
+        if row.validated_by:  all_ids.add(row.validated_by)
+    user_map = {u.id: u.nama_lengkap for u in User.query.filter(
+        User.id.in_(all_ids)
+    ).all()} if all_ids else {}
+
+    return render_template('data_observasi.html',
+        data=pagination,
+        status=status,
+        count_all=count_all,
+        count_pending=count_pending,
+        count_tervalidasi=count_tervalidasi,
+        user_map=user_map,
+    )
 
 
 @app.route('/retrain/activate/<version>')

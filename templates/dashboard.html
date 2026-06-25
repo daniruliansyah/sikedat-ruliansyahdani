@@ -12,7 +12,7 @@
 
 <div class="page-header">
   <h1>Dashboard Analitik</h1>
-  <p>Visualisasi pola kepadatan dan komposisi lalu lintas Jalan Diponegoro Surabaya.</p>
+  <p>Visualisasi pola kepadatan dan komposisi lalu lintas Jalan Diponegoro Musi Utara Surabaya.</p>
 </div>
 
 <!-- ── FILTER BAR ── -->
@@ -427,7 +427,8 @@
   const heatValues = heatFromFlask || {};
 
   const cellSize = 48;
-  const maxV = 120;
+  const allVals = Object.values(heatValues).filter(v => v != null);
+  const maxV = allVals.length > 0 ? Math.max(...allVals) : 1000;
   let heatHtml = `
     <div style="display:grid;grid-template-columns:72px repeat(${hours.length},${cellSize}px);
                 gap:3px;font-size:11px;padding:4px 0;">
@@ -444,11 +445,20 @@
     hours.forEach(hour => {
       const val   = heatValues[`${day}_${hour}`] ?? null;
       const ratio = val != null ? Math.min(val / maxV, 1) : 0;
-      const r = Math.round(14  + ratio * 225);
-      const g = Math.round(34  + ratio * 34);
-      const b = Math.round(48  * (1 - ratio));
+      let r, g, b;
+      if (ratio <= 0.5) {
+        const t = ratio * 2;
+        r = Math.round(15  + t * (26  - 15));
+        g = Math.round(34  + t * (111 - 34));
+        b = Math.round(64  + t * (255 - 64));
+      } else {
+        const t = (ratio - 0.5) * 2;
+        r = Math.round(26  + t * (239 - 26));
+        g = Math.round(111 + t * (68  - 111));
+        b = Math.round(255 + t * (68  - 255));
+      }
       const bg    = val != null ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,0.03)';
-      const color = (ratio > 0.45 && val != null) ? '#fff' : 'var(--text-muted)';
+      const color = val != null ? '#fff' : 'var(--text-muted)';
       heatHtml += `
         <div title="${day} ${hour}:xx → ${val ?? '—'} kend."
              style="height:${cellSize}px;background:${bg};border-radius:5px;

@@ -7,6 +7,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    .btn-lewati {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.3px;
+      transition: transform 0.18s ease, color 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-lewati:hover {
+      transform: scale(1.1);
+      color: var(--text-secondary);
+    }
+  </style>
 </head>
 <body>
 
@@ -37,7 +57,7 @@
           font-style: italic;
           letter-spacing: 0.2px;
         ">
-          studi kasus Jalan Diponegoro, Surabaya
+          studi kasus Jalan Diponegoro Musi Utara, Surabaya
         </p>
       </div>
     </div>
@@ -63,6 +83,16 @@
 
   <!-- ── RIGHT PANEL ── -->
   <div class="login-right">
+
+    <a href="{{ url_for('index') }}" class="btn-lewati">
+      Lewati
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="12 5 19 12 12 19"/>
+      </svg>
+    </a>
+
     <div class="login-form-wrap fade-in delay-1">
 
       <div style="margin-bottom: 32px;">

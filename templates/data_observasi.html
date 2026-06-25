@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Data Observasi{% endblock %}
+{% block page_title %}Data Observasi{% endblock %}
+{% block breadcrumb %}Data Observasi{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Data Observasi</h1>
+  <p>Seluruh data lalu lintas yang telah diproses oleh sistem SIKEDAT.</p>
+</div>
+
+<!-- ── CARD FILTER ── -->
+<div class="grid grid-3 fade-in" style="margin-bottom:20px;">
+
+  <a href="{{ url_for('data_observasi', status='semua') }}" style="text-decoration:none;">
+    <div class="stat-card fade-in delay-1" style="
+      cursor:pointer;
+      {{ 'border:2px solid var(--primary);' if status == 'semua' else 'border:2px solid transparent;' }}
+    ">
+      <span class="stat-icon">📦</span>
+      <div class="stat-label">Semua Data</div>
+      <div class="stat-value">{{ count_all }}</div>
+      <div class="stat-meta">seluruh observasi</div>
+    </div>
+  </a>
+
+  <a href="{{ url_for('data_observasi', status='pending') }}" style="text-decoration:none;">
+    <div class="stat-card warning fade-in delay-2" style="
+      cursor:pointer;
+      {{ 'border:2px solid var(--warning);' if status == 'pending' else 'border:2px solid transparent;' }}
+    ">
+      <span class="stat-icon">⏳</span>
+      <div class="stat-label">Pending</div>
+      <div class="stat-value">{{ count_pending }}</div>
+      <div class="stat-meta">menunggu validasi</div>
+    </div>
+  </a>
+
+  <a href="{{ url_for('data_observasi', status='tervalidasi') }}" style="text-decoration:none;">
+    <div class="stat-card success fade-in delay-3" style="
+      cursor:pointer;
+      {{ 'border:2px solid var(--success);' if status == 'tervalidasi' else 'border:2px solid transparent;' }}
+    ">
+      <span class="stat-icon">✅</span>
+      <div class="stat-label">Tervalidasi</div>
+      <div class="stat-value">{{ count_tervalidasi }}</div>
+      <div class="stat-meta">validated + corrected</div>
+    </div>
+  </a>
+
+</div>
+
+<!-- ── TABEL DATA ── -->
+<div class="card fade-in delay-1">
+  <div class="card-header">
+    <div class="card-title">
+      <span class="dot" style="background:var(--primary);"></span>
+      {% if status == 'pending' %}Data Pending
+      {% elif status == 'tervalidasi' %}Data Tervalidasi
+      {% else %}Semua Data
+      {% endif %}
+    </div>
+    <span style="font-size:12px;color:var(--text-muted);">
+      {{ data.total }} baris · halaman {{ data.page }}/{{ data.pages }}
+    </span>
+  </div>
+
+  {% if data.items %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Hari</th>
+          <th>Jam</th>
+          <th>Menit</th>
+          <th>Motor</th>
+          <th>Mobil</th>
+          <th>Bus</th>
+          <th>Truk</th>
+          <th>Total</th>
+          <th>Kepadatan</th>
+          <th>Status</th>
+          <th>Nama File</th>
+          <th>Diklasifikasi Oleh</th>
+          <th>Divalidasi Oleh</th>
+          <th>Tanggal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set offset = (data.page - 1) * 50 %}
+        {% for row in data.items %}
+        <tr>
+          <td class="td-mono" style="color:var(--text-muted);">{{ offset + loop.index }}</td>
+          <td>{{ row.hari }}</td>
+          <td class="td-mono">{{ '%02d'|format(row.jam) }}:00</td>
+          <td class="td-mono">+{{ '%02d'|format(row.menit) }} mnt</td>
+          <td class="td-mono" style="color:var(--primary-light);">{{ row.motor }}</td>
+          <td class="td-mono" style="color:var(--cyan);">{{ row.mobil }}</td>
+          <td class="td-mono" style="color:var(--success);">{{ row.bus }}</td>
+          <td class="td-mono" style="color:var(--warning);">{{ row.truk }}</td>
+          <td class="td-mono" style="font-weight:700;">{{ row.total_kendaraan }}</td>
+          <td>
+            <span class="badge badge-{{
+              'success' if row.tingkat_kepadatan|lower == 'rendah' else
+              'warning' if row.tingkat_kepadatan|lower == 'sedang' else
+              'danger'
+            }}">
+              <span class="dot"></span>{{ row.tingkat_kepadatan }}
+            </span>
+          </td>
+          <td>
+            {% if row.status_validasi == 'validated' %}
+              <span class="badge badge-success">Validated</span>
+            {% elif row.status_validasi == 'corrected' %}
+              <span class="badge badge-info">Corrected</span>
+            {% else %}
+              <span class="badge badge-warning">Pending</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11.5px;color:var(--text-muted);max-width:160px;
+                     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ row.nama_file or '—' }}">
+            {{ row.nama_file or '—' }}
+          </td>
+          <td style="font-size:12px;">{{ user_map.get(row.classified_by, '—') }}</td>
+          <td style="font-size:12px;">{{ user_map.get(row.validated_by, '—') }}</td>
+          <td style="font-size:11.5px;color:var(--text-muted);">
+            {{ row.created_at.strftime('%d %b %Y') if row.created_at else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── PAGINATION ── -->
+  {% if data.pages > 1 %}
+  <div style="display:flex;align-items:center;justify-content:center;gap:6px;
+              padding:16px 0 4px;flex-wrap:wrap;">
+
+    {% if data.has_prev %}
+    <a href="{{ url_for('data_observasi', status=status, page=data.prev_num) }}"
+       class="btn btn-ghost" style="padding:5px 12px;font-size:12px;">← Prev</a>
+    {% endif %}
+
+    {% for p in data.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <a href="{{ url_for('data_observasi', status=status, page=p) }}"
+           class="btn {{ 'btn-primary' if p == data.page else 'btn-ghost' }}"
+           style="padding:5px 10px;font-size:12px;min-width:34px;text-align:center;">
+          {{ p }}
+        </a>
+      {% else %}
+        <span style="color:var(--text-muted);padding:0 4px;">…</span>
+      {% endif %}
+    {% endfor %}
+
+    {% if data.has_next %}
+    <a href="{{ url_for('data_observasi', status=status, page=data.next_num) }}"
+       class="btn btn-ghost" style="padding:5px 12px;font-size:12px;">Next →</a>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">
+    <div style="font-size:40px;margin-bottom:12px;opacity:0.2;">📂</div>
+    <div style="font-size:14px;">Tidak ada data untuk filter ini.</div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

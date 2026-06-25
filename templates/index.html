@@ -7,12 +7,17 @@
 {% block content %}
 
 <div class="page-header">
-  <h1>Selamat Datang, Admin 👋</h1>
-  <p>Ringkasan sistem klasifikasi kepadatan lalu lintas Jalan Diponegoro, Surabaya.</p>
+  {% if current_user.is_authenticated %}
+    {% set role_name = current_user.role.nama | capitalize if current_user.role else '' %}
+    <h1>Selamat Datang, {{ role_name }} {{ current_user.nama_lengkap or current_user.username }} 👋</h1>
+  {% else %}
+    <h1>Selamat Datang 👋</h1>
+  {% endif %}
+  <p>Ringkasan sistem klasifikasi kepadatan lalu lintas Jalan Diponegoro Musi Utara, Surabaya.</p>
 </div>
 
 <!-- ── STAT CARDS ── -->
-<div class="grid grid-3 fade-in" style="margin-bottom: 24px;">
+<div class="grid {{ 'grid-3' if current_user.is_authenticated else 'grid-2' }} fade-in" style="margin-bottom: 24px;">
 
   <div class="stat-card fade-in delay-1">
     <span class="stat-icon">📊</span>
@@ -61,6 +66,7 @@
     </div>
   </div>
 
+  {% if current_user.is_authenticated %}
   <div class="stat-card warning fade-in delay-3">
     <span class="stat-icon">⏳</span>
     <div class="stat-label">Menunggu Validasi</div>
@@ -69,42 +75,15 @@
       <a href="{{ url_for('validasi') }}" style="color:var(--warning);">Validasi sekarang →</a>
     </div>
   </div>
+  {% endif %}
 
 </div>
 
-<!-- ── ROW 2: Chart Terakhir + Komposisi Harian ── -->
-<div class="grid grid-2 fade-in delay-1" style="margin-bottom: 24px;">
-
-  <!-- Pola Kepadatan Data Terakhir Diproses -->
-  <div class="card fade-in delay-2">
-    <div class="card-header">
-      <div>
-        <div class="card-title">
-          <span class="dot"></span>Pola Kepadatan — Data Terakhir Diproses
-        </div>
-        <div class="card-subtitle">
-          File:
-          <span class="text-mono" style="color:var(--cyan);">
-            {{ last_file_name }}
-          </span>
-          · {{ last_file_rows }} baris
-        </div>
-      </div>
-      <span class="badge badge-primary">Jl. Diponegoro</span>
-    </div>
-
-    <div class="chart-container" style="height: 220px;">
-      <canvas id="chartTerakhir"></canvas>
-    </div>
-    <div class="flex items-center gap-4 mt-3" style="font-size:12px;color:var(--text-muted);">
-      <span><span style="color:var(--danger);">■</span> Tinggi (≥90)</span>
-      <span><span style="color:var(--warning);">■</span> Sedang (55–89)</span>
-      <span><span style="color:var(--primary);">■</span> Rendah (&lt;55)</span>
-    </div>
-  </div>
+<!-- ── ROW 2: Komposisi Harian ── -->
+<div class="grid grid-1 fade-in delay-1" style="margin-bottom: 24px;">
 
   <!-- Rata-rata Komposisi Kendaraan Harian -->
-  <div class="card fade-in delay-3">
+  <div class="card fade-in delay-2">
     <div class="card-header">
       <div>
         <div class="card-title">
@@ -141,8 +120,8 @@
 
 </div>
 
-<!-- ── ROW 3: Distribusi Kepadatan + Log Aktivitas ── -->
-<div class="grid grid-2 fade-in delay-3" style="margin-bottom: 24px;">
+<!-- ── ROW 3: Distribusi Kepadatan ── -->
+<div class="fade-in delay-3" style="margin-bottom: 24px;">
 
   <!-- Distribusi Kepadatan Keseluruhan -->
   <div class="card">
@@ -176,35 +155,6 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-
-  <!-- Log Aktivitas Terbaru -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">
-        <span class="dot" style="background:var(--warning);"></span>
-        Log Aktivitas Terbaru
-      </div>
-      <a href="{{ url_for('validasi') }}" class="btn btn-ghost btn-sm">Lihat Semua</a>
-    </div>
-
-    {% set activities = recent_activities | default([
-      {'title': 'Klasifikasi selesai',  'desc': 'data_senin_pagi.csv · 48 baris diproses',        'time': '10 menit lalu'},
-      {'title': 'Validasi dilakukan',   'desc': '2 label dikoreksi dari Sedang → Tinggi',          'time': '25 menit lalu'},
-      {'title': 'Retrain berhasil',     'desc': 'Model diperbarui dengan 1,008 baris data',        'time': '2 jam lalu'},
-      {'title': 'Upload data baru',     'desc': 'data_minggu_sore.csv · 48 baris ditambahkan',     'time': '3 jam lalu'},
-      {'title': 'Login sistem',         'desc': 'Staff Dishub masuk ke sistem',                    'time': '3 jam lalu'},
-    ]) %}
-    {% for act in activities %}
-    <div class="kv-pair" style="flex-direction:column;align-items:flex-start;gap:3px;padding:12px 0;">
-      <div class="flex items-center justify-between w-full">
-        <span style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ act.title }}</span>
-        <span style="font-size:11px;color:var(--text-muted);">{{ act.time }}</span>
-      </div>
-      <span style="font-size:12px;color:var(--text-muted);">{{ act.desc }}</span>
-    </div>
-    {% endfor %}
-
   </div>
 
 </div>
@@ -255,38 +205,7 @@
   Chart.defaults.font.family = "'DM Mono', monospace";
   Chart.defaults.font.size = 11;
 
-  /* ── Data dari Flask (dari database tabel dataset) ── */
-  const chartLabels = {{ last_chart_labels | tojson }};
-  const chartData   = {{ last_chart_data   | tojson }};
-
-  /* ── Chart Pola Kepadatan Terakhir (bar) ── */
-  new Chart(document.getElementById('chartTerakhir').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: 'Total Kendaraan',
-        data: chartData,
-        backgroundColor: chartData.map(v =>
-          v >= 90 ? 'rgba(239,68,68,0.78)' :
-          v >= 55 ? 'rgba(245,158,11,0.78)' :
-                    'rgba(26,111,255,0.68)'
-        ),
-        borderRadius: 4,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
-      }
-    }
-  });
-
-  /* ── Komposisi per hari (data dummy per hari) ── */
+  /* ── Komposisi per hari ── */
   /* Komposisi rata-rata per hari dari database */
   const komposisiData = {
     semua:  {{ [avg_motor, avg_mobil, avg_bus, avg_truk] | tojson }},

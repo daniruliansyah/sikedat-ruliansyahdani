@@ -87,7 +87,7 @@
 
         <!-- Menit -->
         <div class="form-group">
-          <label class="form-label">Menit (1–59)</label>
+          <label class="form-label">Menit (0–59)</label>
           <div class="input-group">
             <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24"
                  fill="none" stroke="currentColor" stroke-width="2">
@@ -99,7 +99,7 @@
               class="form-control"
               name="menit"
               id="inputMenit"
-              min="1" max="59"
+              min="0" max="59"
               placeholder="cth: 22"
               value="{{ form_data.menit if form_data is defined and form_data.menit else '' }}"
               oninput="previewRounding(this.value)"
@@ -275,17 +275,17 @@
   {% endif %}
   {% endif %}
 
-  /* ── Pembulatan menit ke bawah ke kelipatan 10 ── */
-  function roundDownTo10(val) {
+  /* ── Pembulatan menit ke atas ke kelipatan 10 ── */
+  function roundUpTo10(val) {
     const n = parseInt(val);
-    if (isNaN(n) || n < 1) return null;
-    // Bulatkan ke bawah ke kelipatan 10, minimum 10
-    return Math.max(10, Math.floor(n / 10) * 10);
+    if (isNaN(n) || n < 0) return null;
+    if (n === 0) return 10;
+    return Math.ceil(n / 10) * 10;
   }
 
   function previewRounding(val) {
     const hint    = document.getElementById('roundingHint');
-    const rounded = roundDownTo10(val);
+    const rounded = roundUpTo10(val);
     if (rounded === null || val === '') {
       hint.textContent = '';
       hint.style.color = 'var(--text-muted)';
@@ -297,7 +297,7 @@
     if (n === rounded) {
       hint.innerHTML = `<span style="color:var(--success);">✓ Interval tepat: <strong>menit ke-${rounded}</strong></span>`;
     } else {
-      hint.innerHTML = `<span style="color:var(--warning);">⟶ Akan dibulatkan ke <strong>menit ke-${rounded}</strong> (interval terdekat)</span>`;
+      hint.innerHTML = `<span style="color:var(--warning);">⟶ Akan dibulatkan ke interval atas: <strong>menit ke-${rounded}</strong></span>`;
     }
   }
 
@@ -309,9 +309,9 @@
       return;
     }
     const menitVal = document.getElementById('inputMenit').value;
-    const rounded  = roundDownTo10(menitVal);
-    if (!rounded) {
-      alert('Masukkan menit yang valid (1–59).');
+    const rounded  = roundUpTo10(menitVal);
+    if (rounded === null) {
+      alert('Masukkan menit yang valid (0–59).');
       e.preventDefault();
       return;
     }

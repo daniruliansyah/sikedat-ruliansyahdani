@@ -1,0 +1,5 @@
+Algoritma,Skenario,Best CV F1_weighted,Test Accuracy,Test Precision (w),Test Recall (w),Test F1 (w),Test F1 (macro),Durasi (s),Best Params
+RF,1,0.7166,0.733,0.7318,0.733,0.7299,0.6873,18.7,"{""max_depth"": 10, ""min_samples_leaf"": 1, ""min_samples_split"": 2, ""n_estimators"": 200}"
+SVM,1,0.6539,0.6534,0.6604,0.6534,0.6538,0.6072,2.8,"{""svm__C"": 10, ""svm__gamma"": 0.1, ""svm__kernel"": ""rbf""}"
+RF,2,0.7118,0.6364,0.6496,0.6364,0.6399,0.6365,18.0,"{""max_depth"": null, ""min_samples_leaf"": 1, ""min_samples_split"": 5, ""n_estimators"": 200}"
+SVM,2,0.6591,0.6023,0.621,0.6023,0.6056,0.6027,2.9,"{""svm__C"": 1, ""svm__gamma"": 0.1, ""svm__kernel"": ""rbf""}"

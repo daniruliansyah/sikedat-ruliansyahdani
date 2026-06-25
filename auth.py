@@ -37,4 +37,4 @@ def login():
 def logout():
     logout_user()
     flash('Anda telah berhasil keluar dari sistem.', 'info')
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('index'))
